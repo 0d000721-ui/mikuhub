@@ -31,6 +31,19 @@ class DownloadInstallManager(private val context: Context) {
             return DownloadProgress(id, it.getInt(it.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)), it.getLong(it.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)), it.getLong(it.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)), uri) }
     }
 
+    fun downloadedFile(id: Long): File? {
+        val item = progress(id) ?: return null
+        if (item.status != DownloadManager.STATUS_SUCCESSFUL) return null
+        val uri = item.uri ?: return null
+        return when (uri.scheme) {
+            "file" -> uri.path?.let(::File)
+            "content" -> File(context.cacheDir, "download-$id.apk").also { target ->
+                context.contentResolver.openInputStream(uri)?.use { input -> target.outputStream().use(input::copyTo) }
+            }
+            else -> null
+        }?.takeIf { it.isFile && it.length() > 0 }
+    }
+
     suspend fun installApk(file: File) = withContext(Dispatchers.Main) {
         require(file.isFile && file.length() > 0) { "APK file is unavailable" }
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)

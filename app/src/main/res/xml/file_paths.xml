@@ -6,6 +6,9 @@
   <external-files-path
     name="external_files"
     path="." />
+  <external-path
+    name="public_downloads"
+    path="Download/" />
   <files-path
     name="upload"
     path="." />
