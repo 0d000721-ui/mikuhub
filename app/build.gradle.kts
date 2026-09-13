@@ -9,7 +9,6 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
-    alias(libs.plugins.google.services)
     alias(libs.plugins.firebase.crashlytics)
     alias(libs.plugins.baselineprofile)
 }
@@ -148,6 +147,8 @@ dependencies {
     implementation(libs.androidx.browser)
     implementation(libs.androidx.profileinstaller)
     implementation(libs.termux.terminal.view)
+    implementation(libs.shizuku.api)
+    implementation("dev.rikka.shizuku:provider:13.1.5")
     implementation(libs.guava.listenablefuture)
 
     // Compose

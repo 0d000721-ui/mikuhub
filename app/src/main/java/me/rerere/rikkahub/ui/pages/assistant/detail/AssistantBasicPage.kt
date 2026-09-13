@@ -43,6 +43,7 @@ import me.rerere.ai.provider.ModelType
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.db.entity.WorkspaceEntity
 import me.rerere.rikkahub.data.model.Assistant
+import me.rerere.rikkahub.data.model.AssistantMode
 import me.rerere.rikkahub.ui.components.ai.ModelSelector
 import me.rerere.rikkahub.ui.components.ai.ReasoningButton
 import me.rerere.rikkahub.ui.components.nav.BackButton
@@ -145,6 +146,23 @@ internal fun AssistantBasicContent(
         Card(
             colors = CustomColors.cardColorsOnSurfaceContainer
         ) {
+            FormItem(label = { Text("模式") }, modifier = Modifier.padding(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AssistantMode.entries.forEach { mode ->
+                        androidx.compose.material3.FilterChip(
+                            selected = assistant.mode == mode,
+                            onClick = { onUpdate(assistant.copy(mode = mode)) },
+                            label = { Text(when (mode) { AssistantMode.ROLEPLAY -> "角色扮演"; AssistantMode.NORMAL -> "常规"; AssistantMode.WORK -> "Work" }) }
+                        )
+                    }
+                    Text(when (assistant.mode) {
+                        AssistantMode.ROLEPLAY -> "沉浸式角色对话，不显示思维链。"
+                        AssistantMode.NORMAL -> "使用默认聊天行为。"
+                        AssistantMode.WORK -> "严格遵守指令，减少无意义操作。"
+                    }, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            HorizontalDivider()
             FormItem(
                 label = {
                     Text(stringResource(R.string.assistant_page_name))

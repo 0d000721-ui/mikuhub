@@ -5,12 +5,16 @@ import me.rerere.ai.core.Tool
 import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.event.AppEventBus
 import me.rerere.tts.provider.TTSManager
+import me.rerere.rikkahub.device.DeviceCommandController
+import me.rerere.rikkahub.device.buildDeviceCommandTool
+import me.rerere.rikkahub.device.buildDeviceStatusTool
 
 class LocalTools(
     private val context: Context,
     private val eventBus: AppEventBus,
     private val ttsManager: TTSManager,
     private val settingsStore: SettingsStore,
+    private val deviceController: DeviceCommandController,
 ) {
     val javascriptTool by lazy { buildJavascriptTool() }
 
@@ -27,6 +31,9 @@ class LocalTools(
     val calendarQueryTool by lazy { buildCalendarQueryTool(context) }
 
     val calendarCreateTool by lazy { buildCalendarCreateTool(context) }
+
+    val deviceCommandTool by lazy { buildDeviceCommandTool(deviceController) }
+    val deviceStatusTool by lazy { buildDeviceStatusTool(deviceController) }
 
     fun getTools(options: List<LocalToolOption>): List<Tool> {
         val tools = mutableListOf<Tool>()
@@ -51,6 +58,10 @@ class LocalTools(
         if (options.contains(LocalToolOption.Calendar)) {
             tools.add(calendarQueryTool)
             tools.add(calendarCreateTool)
+        }
+        if (options.contains(LocalToolOption.DeviceCommands)) {
+            tools.add(deviceStatusTool)
+            tools.add(deviceCommandTool)
         }
         return tools
     }

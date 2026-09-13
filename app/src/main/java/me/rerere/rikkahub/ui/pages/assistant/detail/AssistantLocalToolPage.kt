@@ -129,6 +129,16 @@ private fun AssistantLocalToolContent(
     ) {
         CardGroup {
             item(
+                headlineContent = { Text("设备控制（Shizuku / ADB shell）") },
+                supportingContent = { Text("让 AI 查询实际授权并执行本机命令。卸载应用、清除应用数据需要设备确认；请先在设备控制页授权 Shizuku。") },
+                trailingContent = {
+                    Switch(
+                        checked = assistant.localTools.contains(LocalToolOption.DeviceCommands),
+                        onCheckedChange = { toggleLocalTool(LocalToolOption.DeviceCommands, it) },
+                    )
+                },
+            )
+            item(
                 headlineContent = {
                     Text(stringResource(R.string.assistant_page_local_tools_javascript_engine_title))
                 },

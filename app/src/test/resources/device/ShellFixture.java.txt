@@ -1,0 +1,21 @@
+public class ShellFixture {
+    public static void main(String[] args) throws Exception {
+        switch (args[0]) {
+            case "success":
+                System.out.print("Success\n");
+                break;
+            case "failure":
+                System.err.print("Failure [DELETE_FAILED_INTERNAL_ERROR]\n");
+                System.exit(1);
+                break;
+            case "flood":
+                for (int i = 0; i < 100000; i++) System.out.print("output");
+                break;
+            case "wait":
+                System.out.println("ready");
+                System.out.flush();
+                Thread.sleep(60000);
+                break;
+        }
+    }
+}

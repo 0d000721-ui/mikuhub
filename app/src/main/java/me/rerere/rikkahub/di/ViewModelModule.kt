@@ -1,5 +1,6 @@
 package me.rerere.rikkahub.di
 
+import com.google.firebase.FirebaseApp
 import me.rerere.rikkahub.ui.pages.assistant.AssistantVM
 import me.rerere.rikkahub.ui.pages.assistant.detail.AssistantDetailVM
 import me.rerere.rikkahub.ui.pages.backup.BackupVM
@@ -33,7 +34,12 @@ val viewModelModule = module {
             conversationRepo = get(),
             chatService = get(),
             updateChecker = get(),
-            analytics = get(),
+            // Self-built APKs may not configure a default Firebase app.
+            analytics = if (FirebaseApp.getApps(get()).any { it.name == FirebaseApp.DEFAULT_APP_NAME }) {
+                get()
+            } else {
+                null
+            },
             filesManager = get(),
             favoriteRepository = get(),
         )

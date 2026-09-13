@@ -207,6 +207,9 @@ fun ChainOfThoughtScope.ChatMessageReasoningStep(
         expanded = state.expandState == ReasoningCardState.Expanded,
         onExpandedChange = { state.onExpandedChange(it, loading) },
         icon = {
+            if (assistant?.reasoningLevel == me.rerere.ai.core.ReasoningLevel.ULTRA) {
+                UltraThinkingIndicator(loading)
+            }
             Icon(
                 imageVector = HugeIcons.Idea01,
                 contentDescription = null,

@@ -27,7 +27,11 @@ enum class ReasoningLevel(
     XHIGH(16_000, "xhigh"),
 
     @SerialName("max")
-    MAX(32_000, "max");
+    MAX(32_000, "max"),
+
+    /** Highest requested reasoning budget; providers may cap or ignore it. */
+    @SerialName("ultra")
+    ULTRA(64_000, "high");
 
     val isEnabled: Boolean
         get() = this != OFF

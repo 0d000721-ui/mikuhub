@@ -76,6 +76,7 @@ import me.rerere.hugeicons.stroke.Video01
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.Screen
 import me.rerere.rikkahub.data.model.Assistant
+import me.rerere.rikkahub.data.model.AssistantMode
 import me.rerere.rikkahub.data.model.AssistantAffectScope
 import me.rerere.rikkahub.data.model.MessageNode
 import me.rerere.rikkahub.data.model.replaceRegexes
@@ -329,7 +330,7 @@ private fun MessagePartsBlock(
                     ) { step ->
                         when (step) {
                             is ThinkingStep.ReasoningStep -> {
-                                key(step.reasoning.createdAt) {
+                                if (assistant?.mode != AssistantMode.ROLEPLAY) key(step.reasoning.createdAt) {
                                     ChatMessageReasoningStep(
                                         reasoning = step.reasoning,
                                         model = model,

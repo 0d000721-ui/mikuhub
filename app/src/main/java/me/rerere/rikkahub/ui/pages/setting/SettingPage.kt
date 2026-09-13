@@ -92,7 +92,7 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
     val settings by vm.settings.collectAsStateWithLifecycle()
     val filesManager: FilesManager = koinInject()
 
-    if (settings.launchCount > 100 && (settings.launchCount - settings.sponsorAlertDismissedAt) >= 50) {
+    if (false && settings.launchCount > 100 && (settings.launchCount - settings.sponsorAlertDismissedAt) >= 50) {
         AlertDialog(
             onDismissRequest = {
                 vm.updateSettings(settings.copy(sponsorAlertDismissedAt = settings.launchCount))
@@ -257,6 +257,33 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
                     title = { Text(stringResource(R.string.setting_page_data_settings)) },
                 ) {
                     item(
+                        onClick = { navController.navigate(Screen.DeviceAudit) },
+                        leadingContent = { Icon(HugeIcons.Alert01, null) },
+                        supportingContent = { Text("查看设备命令执行记录") },
+                        headlineContent = { Text("设备审计日志") },
+                    )
+                    item(
+                        onClick = { navController.navigate(Screen.DeviceControl) },
+                        leadingContent = { Icon(HugeIcons.Settings03, null) },
+                        supportingContent = { Text("Shizuku、会话授权和无障碍控制") },
+                        headlineContent = { Text("设备控制") },
+                    )
+                    item(
+                        onClick = { navController.navigate(Screen.DevicePerformance) },
+                        leadingContent = { Icon(HugeIcons.LookTop, null) },
+                        supportingContent = { Text("刷新率、CPU 频率和可用功耗信息") },
+                        headlineContent = { Text("性能监控") },
+                    )
+                    item(
+                        onClick = { navController.navigate(Screen.DeviceUsage) },
+                        leadingContent = { Icon(HugeIcons.Brain02, null) },
+                        supportingContent = { Text("Token、缓存命中率和上下文上限") },
+                        headlineContent = { Text("Token 与上下文统计") },
+                    )
+                    item(onClick = { navController.navigate(Screen.DeviceDownload) }, leadingContent = { Icon(HugeIcons.Package, null) }, supportingContent = { Text("下载并准备安装 APK") }, headlineContent = { Text("下载与安装") })
+                    item(onClick = { navController.navigate(Screen.DeviceTraffic) }, leadingContent = { Icon(HugeIcons.GlobalSearch, null) }, supportingContent = { Text("本地 VPN 流量调试和证书管理") }, headlineContent = { Text("流量调试") })
+                    item(onClick = { navController.navigate(Screen.DeviceMemory) }, leadingContent = { Icon(HugeIcons.Brain02, null) }, supportingContent = { Text("仅限自有或 debuggable 目标的只读诊断") }, headlineContent = { Text("内存诊断") })
+                    item(
                         onClick = { navController.navigate(Screen.Backup) },
                         leadingContent = { Icon(HugeIcons.Database02, null) },
                         supportingContent = { Text(stringResource(R.string.setting_page_data_backup_desc)) },
@@ -349,12 +376,6 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
                         leadingContent = { Icon(HugeIcons.Bookshelf01, null) },
                         supportingContent = { Text(stringResource(R.string.setting_page_request_logs_desc)) },
                         headlineContent = { Text(stringResource(R.string.setting_page_request_logs)) },
-                    )
-                    item(
-                        onClick = { navController.navigate(Screen.SettingDonate) },
-                        leadingContent = { Icon(HugeIcons.InLove, null) },
-                        supportingContent = { Text(stringResource(R.string.setting_page_donate_desc)) },
-                        headlineContent = { Text(stringResource(R.string.setting_page_donate)) },
                     )
                     item(
                         onClick = {

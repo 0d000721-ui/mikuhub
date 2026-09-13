@@ -13,6 +13,9 @@ import java.util.concurrent.TimeUnit
 import kotlin.uuid.Uuid
 
 @Serializable
+enum class AssistantMode { ROLEPLAY, NORMAL, WORK }
+
+@Serializable
 data class Assistant(
     val id: Uuid = Uuid.random(),
     val chatModelId: Uuid? = null, // 如果为null, 使用全局默认模型
@@ -21,6 +24,7 @@ data class Assistant(
     val useAssistantAvatar: Boolean = false, // 使用助手头像替代模型头像
     val tags: List<Uuid> = emptyList(),
     val systemPrompt: String = "",
+    val mode: AssistantMode = AssistantMode.NORMAL,
     val temperature: Float? = null,
     val topP: Float? = null,
     // 上下文消息条数上限, 超出后阶梯式截断; 0 表示不限制

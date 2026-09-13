@@ -8,7 +8,7 @@ private const val TAG = "CrashHandler"
 private const val PREFS_NAME = "crash_handler"
 private const val KEY_CRASHED = "crashed"
 private const val KEY_STACKTRACE = "stacktrace"
-private const val MAX_STACKTRACE_LENGTH = 8000
+private const val MAX_STACKTRACE_LENGTH = 128000
 
 object CrashHandler {
     fun install(context: Context) {
@@ -40,7 +40,10 @@ object CrashHandler {
         val stackTrace = buildString {
             appendLine("Thread: ${thread.name}")
             appendLine(throwable.stackTraceToString())
-        }.take(MAX_STACKTRACE_LENGTH)
+        }.let { trace ->
+            if (trace.length <= MAX_STACKTRACE_LENGTH) trace
+            else trace.take(MAX_STACKTRACE_LENGTH / 2) + "\n[stack truncated]\n" + trace.takeLast(MAX_STACKTRACE_LENGTH / 2)
+        }
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit(commit = true) {
                 putBoolean(KEY_CRASHED, true)

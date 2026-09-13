@@ -19,8 +19,28 @@ import me.rerere.rikkahub.utils.UpdateChecker
 import me.rerere.rikkahub.web.WebServerManager
 import me.rerere.tts.provider.TTSManager
 import org.koin.dsl.module
+import me.rerere.rikkahub.device.ShizukuManager
+import me.rerere.rikkahub.device.DeviceAuditStore
+import me.rerere.rikkahub.device.DownloadInstallManager
+import me.rerere.rikkahub.device.DebugCertificateStore
+import me.rerere.rikkahub.device.AndroidDeviceCommandBackend
+import me.rerere.rikkahub.device.DeviceCommandBackend
+import me.rerere.rikkahub.device.DeviceCommandConfirmations
+import me.rerere.rikkahub.device.DeviceCommandController
+import me.rerere.rikkahub.device.RootDeviceCommandRunner
+import me.rerere.rikkahub.device.ShizukuDeviceCommandRunner
 
 val appModule = module {
+    single { ShizukuManager() }
+    single { DeviceAuditStore(get()) }
+    single { DownloadInstallManager(get()) }
+    single { DebugCertificateStore(get()) }
+    single { me.rerere.rikkahub.device.DeviceAccessSession(get<DeviceAuditStore>()::append) }
+    single { DeviceCommandConfirmations() }
+    single { ShizukuDeviceCommandRunner(get()) }
+    single { RootDeviceCommandRunner() }
+    single<DeviceCommandBackend> { AndroidDeviceCommandBackend(get(), get(), get()) }
+    single { DeviceCommandController(get(), get(), get()) }
     single<Json> { JsonInstant }
 
     single {
@@ -28,7 +48,7 @@ val appModule = module {
     }
 
     single {
-        LocalTools(get(), get(), get(), get())
+        LocalTools(get(), get(), get(), get(), get())
     }
 
     single {

@@ -123,6 +123,14 @@ import me.rerere.rikkahub.ui.pages.setting.SettingSpeechPage
 import me.rerere.rikkahub.ui.pages.setting.SettingWebPage
 import me.rerere.rikkahub.ui.pages.share.handler.ShareHandlerPage
 import me.rerere.rikkahub.ui.pages.stats.StatsPage
+import me.rerere.rikkahub.ui.pages.device.AuditPage
+import me.rerere.rikkahub.ui.pages.device.DeviceControlPage
+import me.rerere.rikkahub.ui.pages.device.PerformancePage
+import me.rerere.rikkahub.ui.pages.device.UsageContextPage
+import me.rerere.rikkahub.ui.pages.device.DownloadPage
+import me.rerere.rikkahub.ui.pages.device.TrafficDebugPage
+import me.rerere.rikkahub.ui.pages.device.MemoryDiagnosticsPage
+import me.rerere.rikkahub.ui.components.device.DeviceCommandConfirmationHost
 import me.rerere.rikkahub.ui.pages.translator.TranslatorPage
 import me.rerere.rikkahub.ui.pages.webview.WebViewPage
 import me.rerere.rikkahub.ui.theme.LocalDarkMode
@@ -287,6 +295,7 @@ class RouteActivity : ComponentActivity() {
                     showCloseButton = true,
                 )
                 TTSController()
+                DeviceCommandConfirmationHost()
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -529,6 +538,13 @@ class RouteActivity : ComponentActivity() {
                             entry<Screen.Stats> {
                                 StatsPage()
                             }
+                            entry<Screen.DeviceAudit> { AuditPage() }
+                            entry<Screen.DeviceControl> { DeviceControlPage() }
+                            entry<Screen.DevicePerformance> { PerformancePage() }
+                            entry<Screen.DeviceUsage> { UsageContextPage() }
+                            entry<Screen.DeviceDownload> { DownloadPage() }
+                            entry<Screen.DeviceTraffic> { TrafficDebugPage() }
+                            entry<Screen.DeviceMemory> { MemoryDiagnosticsPage() }
                         }
                     )
                     if (BuildConfig.DEBUG) {
@@ -731,4 +747,18 @@ sealed interface Screen : NavKey {
 
     @Serializable
     data object Stats : Screen
+    @Serializable
+    data object DeviceAudit : Screen
+    @Serializable
+    data object DeviceControl : Screen
+    @Serializable
+    data object DevicePerformance : Screen
+    @Serializable
+    data object DeviceUsage : Screen
+    @Serializable
+    data object DeviceDownload : Screen
+    @Serializable
+    data object DeviceTraffic : Screen
+    @Serializable
+    data object DeviceMemory : Screen
 }

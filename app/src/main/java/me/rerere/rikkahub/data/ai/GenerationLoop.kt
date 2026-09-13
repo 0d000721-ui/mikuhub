@@ -42,6 +42,7 @@ import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.findProvider
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.AssistantMemory
+import me.rerere.rikkahub.data.model.systemPrompt
 import java.io.File
 import java.io.IOException
 import java.net.ConnectException
@@ -353,6 +354,10 @@ class GenerationLoop(
                     }
                 if (effectiveSystemPrompt.isNotBlank()) {
                     append(effectiveSystemPrompt)
+                }
+                assistant.mode.systemPrompt.takeIf { it.isNotBlank() }?.let {
+                    appendLine()
+                    append(it)
                 }
 
                 // 记忆
