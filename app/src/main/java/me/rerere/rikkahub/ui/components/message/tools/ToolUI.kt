@@ -89,7 +89,7 @@ private object DefaultToolUIRenderer : ToolUIRenderer {
  * 工具 UI 渲染器注册表, 为新工具定制渲染时在 [renderers] 中注册即可
  */
 object ToolUIRegistry {
-    private val renderers: Map<String, ToolUIRenderer> = listOf(
+    private val renderers: Map<String, ToolUIRenderer> = (listOf(
         MemoryToolUI,
         SearchWebToolUI,
         ScrapeWebToolUI,
@@ -106,7 +106,7 @@ object ToolUIRegistry {
         ReadFileToolUI,
         WriteFileToolUI,
         ShellToolUI,
-    ).associateBy { it.toolName }
+    ) + browserDownloadToolRenderers).associateBy { it.toolName }
 
     /** 查找工具对应的渲染器, 未注册时返回默认渲染器 */
     fun resolve(toolName: String): ToolUIRenderer = renderers[toolName] ?: DefaultToolUIRenderer

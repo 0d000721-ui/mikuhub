@@ -75,6 +75,23 @@ class DeviceCommandControllerTest {
         assertFalse(session.audit().single().allowed)
     }
 
+    @Test fun rejectionFeedbackReachesTheAgentAndAuditWithoutRunningCommand() = runBlocking {
+        val backend = FakeBackend()
+        val session = DeviceAccessSession()
+        val approvals = DeviceCommandConfirmations()
+        val controller = DeviceCommandController(session, backend, approvals)
+        val work = async { controller.execute("pm clear com.example.demo", "清除数据") }
+        val request = withTimeout(2_000) { approvals.pending.first { it != null }!! }
+        approvals.reject(request.id, "请保留数据，只查看占用空间")
+        val result = withTimeout(2_000) { work.await() }
+        assertFalse(result.success())
+        assertTrue(result["user_rejected"]!!.jsonPrimitive.boolean)
+        assertTrue(result["error"]!!.jsonPrimitive.content.contains("请保留数据，只查看占用空间"))
+        assertTrue(session.audit().single().error!!.contains("请保留数据，只查看占用空间"))
+        assertTrue(backend.commands.isEmpty())
+        assertNull(approvals.pending.value)
+    }
+
     @Test fun modelSuppliedConfirmationCannotApproveItsOwnToolCall() = runBlocking {
         val backend = FakeBackend()
         val approvals = DeviceCommandConfirmations()
@@ -207,13 +224,64 @@ class DeviceCommandControllerTest {
 
     private fun JsonObject.success() = getValue("success").jsonPrimitive.boolean
 
+    @Test fun userSelectedRootWorksWithoutShizukuAndStillRequiresConfirmation() = runBlocking {
+        val backend = FakeBackend().apply { state = ShizukuState.UNAVAILABLE; output = "uid=0(root)\n" }
+        val session = DeviceAccessSession().apply { selectTransport(DeviceTransport.ROOT); authorizeSession() }
+        val approvals = DeviceCommandConfirmations()
+        val controller = DeviceCommandController(session, backend, approvals)
+        assertEquals("root", controller.status()["selected_transport"]!!.jsonPrimitive.content)
+        val work = async { controller.execute("id", "verify root") }
+        val request = withTimeout(2_000) { approvals.pending.first { it != null }!! }
+        assertEquals(DeviceTransport.ROOT, request.transport)
+        assertTrue(backend.commands.isEmpty())
+        approvals.confirm(request.id, request.step)
+        assertTrue(withTimeout(2_000) { work.await() }.success())
+        assertEquals(listOf(DeviceTransport.ROOT to "id"), backend.commands)
+    }
+
+    @Test fun rootStatusReportsLastVerificationWithoutProbingAndFailureNeverFallsBack() = runBlocking {
+        val backend = FakeBackend().apply {
+            root = RootAccessStatus(RootState.AUTHORIZED, "UID 0 verified", 123L)
+            failure = DeviceShellException(DeviceShellResult(1, "Permission denied"))
+        }
+        val session = DeviceAccessSession().apply { selectTransport(DeviceTransport.ROOT) }
+        val approvals = DeviceCommandConfirmations()
+        val controller = DeviceCommandController(session, backend, approvals)
+        val status = controller.status()
+        assertTrue(status["root"]!!.jsonObject["last_verified_uid_0"]!!.jsonPrimitive.boolean)
+        assertTrue(status["available_transports"]!!.jsonArray.any { it.jsonPrimitive.content == "root" })
+        assertTrue(backend.commands.isEmpty())
+        val work = async { controller.execute("id", "verify root") }
+        val request = withTimeout(2_000) { approvals.pending.first { it != null }!! }
+        approvals.confirm(request.id, request.step)
+        assertFalse(withTimeout(2_000) { work.await() }.success())
+        assertEquals(listOf(DeviceTransport.ROOT to "id"), backend.commands)
+    }
+
+    @Test fun switchingTransportCancelsOldRootApproval() = runBlocking {
+        val backend = FakeBackend()
+        val session = DeviceAccessSession().apply { selectTransport(DeviceTransport.ROOT) }
+        val approvals = DeviceCommandConfirmations()
+        val controller = DeviceCommandController(session, backend, approvals)
+        val work = async { controller.execute("id", "verify root") }
+        val request = withTimeout(2_000) { approvals.pending.first { it != null }!! }
+        session.selectTransport(DeviceTransport.SHIZUKU)
+        withTimeout(2_000) { work.join() }
+        approvals.confirm(request.id, request.step)
+        assertTrue(work.isCancelled)
+        assertNull(approvals.pending.value)
+        assertTrue(backend.commands.isEmpty())
+        assertEquals(DeviceTransport.SHIZUKU, DeviceAccessSession().state.value.preferredTransport)
+    }
+
     private class FakeBackend : DeviceCommandBackend {
         var state = ShizukuState.AUTHORIZED
+        var root = RootAccessStatus()
         var output = "Success\n"
         var failure: Exception? = null
         var block: (suspend () -> Unit)? = null
         val commands = java.util.concurrent.CopyOnWriteArrayList<Pair<DeviceTransport, String>>()
-        override suspend fun status() = DeviceBackendStatus(state, 2000)
+        override suspend fun status() = DeviceBackendStatus(state, 2000, root = root)
         override suspend fun run(transport: DeviceTransport, command: String): String {
             commands += transport to command
             block?.invoke()

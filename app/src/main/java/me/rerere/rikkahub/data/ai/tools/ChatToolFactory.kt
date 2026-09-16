@@ -11,6 +11,10 @@ import me.rerere.rikkahub.data.ai.tools.local.LocalTools
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.files.SkillManager
 import me.rerere.rikkahub.data.model.Assistant
+import me.rerere.rikkahub.data.model.AssistantMode
+import me.rerere.rikkahub.browser.AgentBrowserController
+import me.rerere.rikkahub.device.DownloadInstallManager
+import me.rerere.rikkahub.device.ApkInstallManager
 import me.rerere.rikkahub.data.repository.ConversationRepository
 import me.rerere.rikkahub.data.repository.MemoryRepository
 import me.rerere.rikkahub.data.repository.WorkspaceRepository
@@ -34,6 +38,9 @@ class ChatToolFactory(
     private val mcpManager: McpManager,
     private val skillManager: SkillManager,
     private val workspaceRepository: WorkspaceRepository,
+    private val downloadManager: DownloadInstallManager,
+    private val apkInstallManager: ApkInstallManager,
+    private val browserController: AgentBrowserController,
 ) {
     suspend fun createTools(
         settings: Settings,
@@ -60,6 +67,11 @@ class ChatToolFactory(
             addAll(createSearchTools(settings))
         }
         addAll(localTools.getTools(assistant.localTools))
+        if (assistant.mode != AssistantMode.ROLEPLAY) {
+            addAll(createDownloadTools(downloadManager))
+            addAll(createApkInstallTools(apkInstallManager))
+            addAll(createBrowserTools(browserController))
+        }
         if (assistant.enableRecentChatsReference) {
             addAll(createConversationTools(conversationRepository, assistant.id))
         }

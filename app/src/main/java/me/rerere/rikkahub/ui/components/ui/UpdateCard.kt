@@ -17,12 +17,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Text
+import androidx.compose.material3.Surface
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,19 +34,28 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEach
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dokar.sonner.ToastType
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.Cancel01
 import me.rerere.hugeicons.stroke.Download01
 import me.rerere.rikkahub.BuildConfig
 import me.rerere.rikkahub.R
+import me.rerere.rikkahub.Screen
+import me.rerere.rikkahub.device.DownloadInstallManager
 import me.rerere.rikkahub.ui.components.richtext.MarkdownBlock
 import me.rerere.rikkahub.ui.context.LocalToaster
+import me.rerere.rikkahub.ui.context.LocalNavController
 import me.rerere.rikkahub.ui.hooks.useThrottle
 import me.rerere.rikkahub.ui.pages.chat.ChatVM
 import me.rerere.rikkahub.utils.UpdateDownload
 import me.rerere.rikkahub.utils.Version
+import me.rerere.rikkahub.utils.isCustomBuild
+import me.rerere.rikkahub.utils.officialComparisonVersion
 import me.rerere.rikkahub.utils.onError
 import me.rerere.rikkahub.utils.onSuccess
+import me.rerere.rikkahub.utils.openUrl
+import org.koin.compose.koinInject
 import me.rerere.rikkahub.utils.toLocalDateTime
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -56,6 +67,10 @@ fun UpdateCard(vm: ChatVM) {
     val state by vm.updateState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val toaster = LocalToaster.current
+    val downloads = koinInject<DownloadInstallManager>()
+    val nav = LocalNavController.current
+    val scope = rememberCoroutineScope()
+    var downloadStarting by remember { mutableStateOf(false) }
     state.onError {
         Card {
             Column(
@@ -80,7 +95,8 @@ fun UpdateCard(vm: ChatVM) {
     state.onSuccess { info ->
         var showDetail by remember { mutableStateOf(false) }
         var dismissed by remember { mutableStateOf(false) }
-        val current = remember { Version(BuildConfig.VERSION_NAME) }
+        val customBuild = remember { isCustomBuild(BuildConfig.VERSION_NAME) }
+        val current = remember { officialComparisonVersion(BuildConfig.VERSION_NAME) }
         val latest = remember(info) { Version(info.version) }
         if (latest > current && !dismissed) {
             Card(
@@ -100,7 +116,7 @@ fun UpdateCard(vm: ChatVM) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = stringResource(R.string.update_card_new_version_found, info.version),
+                            text = if (customBuild) "RikkaHub 官方版 ${info.version} 可下载" else stringResource(R.string.update_card_new_version_found, info.version),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.weight(1f)
@@ -113,6 +129,13 @@ fun UpdateCard(vm: ChatVM) {
                             )
                         }
                     }
+                    if (customBuild) {
+                        Text(
+                            "RikkaHub 官方版将独立安装，不包含本定制功能",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     MarkdownBlock(
                         content = info.changelog,
                         style = MaterialTheme.typography.bodySmall,
@@ -123,9 +146,23 @@ fun UpdateCard(vm: ChatVM) {
         }
         if (showDetail) {
             val downloadHandler = useThrottle<UpdateDownload>(500) { item ->
-                vm.updateChecker.downloadUpdate(context, item)
-                showDetail = false
-                toaster.show(context.getString(R.string.update_card_downloading), type = ToastType.Info)
+                if (!downloadStarting) {
+                    downloadStarting = true
+                    scope.launch {
+                        try {
+                            vm.updateChecker.downloadUpdate(item, downloads)
+                            showDetail = false
+                            nav.navigate(Screen.DeviceDownload)
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (error: Exception) {
+                            toaster.show("无法创建下载任务，已打开浏览器下载", type = ToastType.Error)
+                            context.openUrl(item.url)
+                        } finally {
+                            downloadStarting = false
+                        }
+                    }
+                }
             }
             ModalBottomSheet(
                 onDismissRequest = { showDetail = false },
@@ -139,7 +176,7 @@ fun UpdateCard(vm: ChatVM) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
-                        text = info.version,
+                        text = if (customBuild) "RikkaHub 官方版 ${info.version}" else info.version,
                         style = MaterialTheme.typography.headlineMedium,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -148,6 +185,18 @@ fun UpdateCard(vm: ChatVM) {
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary
                     )
+                    if (customBuild) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            shape = MaterialTheme.shapes.medium,
+                        ) {
+                            Text(
+                                "RikkaHub 官方版将独立安装，不包含本定制功能",
+                                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                    }
                     MarkdownBlock(
                         content = info.changelog,
                         modifier = Modifier
@@ -158,6 +207,7 @@ fun UpdateCard(vm: ChatVM) {
                     )
                     info.downloads.fastForEach { downloadItem ->
                         OutlinedCard(
+                            enabled = !downloadStarting,
                             onClick = {
                                 downloadHandler(downloadItem)
                             },
@@ -170,7 +220,7 @@ fun UpdateCard(vm: ChatVM) {
                                 },
                                 supportingContent = {
                                     Text(
-                                        text = downloadItem.size
+                                        text = if (customBuild) "${downloadItem.size} · 下载RikkaHub 官方版" else downloadItem.size
                                     )
                                 },
                                 leadingContent = {

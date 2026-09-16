@@ -121,7 +121,7 @@ fun SettingAboutPage() {
                         )
 
                         Text(
-                            text = "RikkaHub",
+                            text = stringResource(R.string.app_name),
                             style = MaterialTheme.typography.displaySmall,
                         )
                     }
@@ -157,22 +157,28 @@ fun SettingAboutPage() {
                         modifier = Modifier.padding(horizontal = 8.dp),
                     ) {
                         item(
-                            onClick = { context.openUrl("https://rikka-ai.com/") },
+                            onClick = { context.openUrl("https://github.com/0d000721-ui/mikuhub") },
                             leadingContent = { Icon(HugeIcons.Earth, null) },
-                            supportingContent = { Text("https://rikka-ai.com") },
+                            supportingContent = { Text("MikuHub · 基于 RikkaHub 定制") },
                             headlineContent = { Text(stringResource(R.string.about_page_website)) },
+                        )
+                        item(
+                            onClick = { context.openUrl("https://github.com/0d000721-ui/mikuhub") },
+                            leadingContent = { Icon(HugeIcons.Github, null) },
+                            supportingContent = { Text("https://github.com/0d000721-ui/mikuhub") },
+                            headlineContent = { Text(stringResource(R.string.about_page_github)) },
+                        )
+                        item(
+                            onClick = { context.openUrl("https://github.com/0d000721-ui/mikuhub/blob/master/LICENSE") },
+                            leadingContent = { Icon(HugeIcons.File02, null) },
+                            supportingContent = { Text("https://github.com/0d000721-ui/mikuhub/blob/master/LICENSE") },
+                            headlineContent = { Text(stringResource(R.string.about_page_license)) },
                         )
                         item(
                             onClick = { context.openUrl("https://github.com/rikkahub/rikkahub") },
                             leadingContent = { Icon(HugeIcons.Github, null) },
-                            supportingContent = { Text("https://github.com/rikkahub/rikkahub") },
-                            headlineContent = { Text(stringResource(R.string.about_page_github)) },
-                        )
-                        item(
-                            onClick = { context.openUrl("https://github.com/rikkahub/rikkahub/blob/master/LICENSE") },
-                            leadingContent = { Icon(HugeIcons.File02, null) },
-                            supportingContent = { Text("https://github.com/rikkahub/rikkahub/blob/master/LICENSE") },
-                            headlineContent = { Text(stringResource(R.string.about_page_license)) },
+                            supportingContent = { Text("基于 RikkaHub 开源项目开发，感谢原作者及贡献者") },
+                            headlineContent = { Text("上游项目 · RikkaHub") },
                         )
                     }
                 }

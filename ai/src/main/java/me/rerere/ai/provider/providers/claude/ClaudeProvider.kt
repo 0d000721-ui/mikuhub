@@ -113,6 +113,8 @@ internal suspend fun generateClaudeWithPauseTurn(
             return result.copy(
                 message = combinedMessage.copy(usage = combinedUsage),
                 usage = combinedUsage,
+                latestRequestUsage = result.usage ?: if (continuationCount > 0) TokenUsage() else null,
+                requestCount = continuationCount + 1,
             )
         }
 
@@ -142,6 +144,16 @@ internal fun streamClaudeWithPauseTurn(
         var finish: StreamChunk.Finish? = null
         val responseIndexOffset = nextServerToolBlockIndex
 
+        if (continuationCount > 0) {
+            // The next pass has a different input. Clear the previous request snapshot even
+            // if this continuation fails or never returns usage; preserve billed totals.
+            emit(StreamChunk.Usage(
+                usage = completedUsage ?: TokenUsage(),
+                latestRequestUsage = TokenUsage(),
+                requestCount = continuationCount + 1,
+            ))
+        }
+
         request(requestMessages).collect { rawChunk ->
             val chunk = rawChunk.rebaseClaudeServerToolIndexes(responseIndexOffset)
             chunk.maxClaudeServerToolIndex()?.let { maxIndex ->
@@ -151,7 +163,13 @@ internal fun streamClaudeWithPauseTurn(
             when (chunk) {
                 is StreamChunk.Usage -> {
                     passUsage = passUsage.merge(chunk.usage)
-                    completedUsage.sum(passUsage)?.let { emit(StreamChunk.Usage(it)) }
+                    completedUsage.sum(passUsage)?.let {
+                        emit(StreamChunk.Usage(
+                            usage = it,
+                            latestRequestUsage = passUsage,
+                            requestCount = continuationCount + 1,
+                        ))
+                    }
                 }
 
                 is StreamChunk.Finish -> {

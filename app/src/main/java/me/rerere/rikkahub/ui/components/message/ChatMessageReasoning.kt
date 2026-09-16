@@ -93,11 +93,10 @@ private fun rememberReasoningState(reasoning: UIMessagePart.Reasoning): Pair<Rea
         )
     }
 
-    LaunchedEffect(reasoning.reasoning, loading) {
+    LaunchedEffect(state, loading, settings.displaySetting.showThinkingContent, settings.displaySetting.autoCloseThinking) {
         if (loading) {
             if (!state.expandState.expanded && settings.displaySetting.showThinkingContent)
                 state.expandState = ReasoningCardState.Preview
-            scrollState.animateScrollTo(scrollState.maxValue)
         } else {
             if (state.expandState.expanded) {
                 state.expandState = if (settings.displaySetting.autoCloseThinking)
@@ -108,12 +107,21 @@ private fun rememberReasoningState(reasoning: UIMessagePart.Reasoning): Pair<Rea
         }
     }
 
-    LaunchedEffect(loading) {
+    // Follow the compact preview by layout height instead of cancelling/restarting an animation per token.
+    LaunchedEffect(state, loading, state.expandState, scrollState) {
+        if (loading && state.expandState == ReasoningCardState.Preview) {
+            androidx.compose.runtime.snapshotFlow { scrollState.maxValue }.collect { scrollState.scrollTo(it) }
+        }
+    }
+
+    LaunchedEffect(reasoning.createdAt, reasoning.finishedAt) {
         if (loading) {
             while (isActive) {
                 state.duration = (reasoning.finishedAt ?: Clock.System.now()) - reasoning.createdAt
-                delay(50)
+                delay(100)
             }
+        } else {
+            state.duration = reasoning.finishedAt!! - reasoning.createdAt
         }
     }
 
@@ -175,6 +183,7 @@ private fun ReasoningContent(
                     visual = true,
                 ),
                 style = reasoningTextStyle,
+                isStreaming = loading,
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -199,7 +208,7 @@ fun ChainOfThoughtScope.ChatMessageReasoningStep(
     collapsedAdaptiveWidth: Boolean = false,
 ) {
     val (state, loading) = rememberReasoningState(reasoning)
-    val thinkingTitle = reasoning.reasoning.extractThinkingTitle()
+    val thinkingTitle = remember(reasoning.reasoning) { reasoning.reasoning.extractThinkingTitle() }
     val showThinkingTitle = loading && thinkingTitle != null
     val chatFontFamily = LocalTextStyle.current.fontFamily
 

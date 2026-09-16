@@ -42,6 +42,7 @@ import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.findProvider
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.AssistantMemory
+import me.rerere.rikkahub.data.model.captureRequestContext
 import me.rerere.rikkahub.data.model.systemPrompt
 import java.io.File
 import java.io.IOException
@@ -387,7 +388,25 @@ class GenerationLoop(
             workspaceCwd = workspaceCwd,
         )
 
-        var messages: List<UIMessage> = messages
+        val requestContext = captureRequestContext(
+            model = model,
+            preparedMessages = internalMessages,
+            conversationMessages = messages,
+            contextMessageLimit = assistant.contextMessageLimit,
+            toolCount = tools.size,
+        )
+        var messages: List<UIMessage> = if (messages.lastOrNull()?.role == MessageRole.ASSISTANT) {
+            messages.dropLast(1) + messages.last().copy(requestContext = requestContext, finishedAt = null)
+        } else {
+            messages + UIMessage(
+                role = MessageRole.ASSISTANT,
+                parts = emptyList(),
+                modelId = model.id,
+                requestContext = requestContext,
+            )
+        }
+        // Surface the prepared input immediately, including non-streaming providers.
+        onUpdateMessages(messages)
         val params = TextGenerationParams(
             model = model,
             temperature = assistant.temperature,

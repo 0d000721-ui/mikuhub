@@ -18,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import kotlinx.serialization.Serializable
@@ -54,15 +55,18 @@ fun RikkahubTheme(
     }
     val amoledDarkMode by rememberAmoledDarkMode()
 
-    val colorScheme = when {
-        settings.dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        else -> {
-            val theme = findThemeById(settings.themeId, settings.customThemes)
-                ?: findPresetTheme(settings.themeId)
-            theme.getColorScheme(dark = darkTheme)
+    val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val colorScheme = remember(context, configuration, darkTheme, settings.dynamicColor, settings.themeId, settings.customThemes) {
+        when {
+            settings.dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+                if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            }
+            else -> {
+                val theme = findThemeById(settings.themeId, settings.customThemes)
+                    ?: findPresetTheme(settings.themeId)
+                theme.getColorScheme(dark = darkTheme)
+            }
         }
     }
     val colorSchemeConverted = remember(darkTheme, amoledDarkMode, colorScheme) {

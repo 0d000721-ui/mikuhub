@@ -81,7 +81,6 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastForEach
 import androidx.core.net.toUri
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
@@ -116,9 +115,7 @@ private val flavour by lazy {
     )
 }
 
-private val parser by lazy {
-    MarkdownParser(flavour)
-}
+private val parser = ThreadLocal.withInitial { MarkdownParser(flavour) }
 
 private val INLINE_LATEX_REGEX = Regex("\\\\\\((.+?)\\\\\\)")
 private val BLOCK_LATEX_REGEX = Regex("\\\\\\[(.+?)\\\\\\]", RegexOption.DOT_MATCHES_ALL)
@@ -219,6 +216,8 @@ private data class MarkdownParseResult(
     val hasHtml: Boolean,
 )
 
+private val markdownCache = TextRenderCache<MarkdownParseResult>()
+
 private fun ASTNode.containsHtml(): Boolean {
     if (type == MarkdownElementTypes.HTML_BLOCK || type == MarkdownTokenTypes.HTML_TAG) return true
     return children.any { it.containsHtml() }
@@ -226,7 +225,7 @@ private fun ASTNode.containsHtml(): Boolean {
 
 private fun parseMarkdown(content: String): MarkdownParseResult {
     val preprocessed = preProcess(content)
-    val astTree = parser.buildMarkdownTreeFromString(preprocessed)
+    val astTree = checkNotNull(parser.get()).buildMarkdownTreeFromString(preprocessed)
     return MarkdownParseResult(preprocessed, astTree, astTree.containsHtml())
 }
 
@@ -235,37 +234,48 @@ fun MarkdownBlock(
     content: String,
     modifier: Modifier = Modifier,
     style: TextStyle = LocalTextStyle.current,
-    onClickCitation: (String) -> Unit = {}
+    onClickCitation: (String) -> Unit = {},
+    isStreaming: Boolean = false,
 ) {
-    var (data, setData) = remember { mutableStateOf(parseMarkdown(content)) }
+    var (data, setData) = remember { mutableStateOf(markdownCache[content]) }
 
     // 监听内容变化，重新解析AST树
     // 这里在后台线程解析AST树, 防止频繁更新的时候掉帧
     val updatedContent by rememberUpdatedState(content)
+    val streaming by rememberUpdatedState(isStreaming)
     LaunchedEffect(Unit) {
-        snapshotFlow { updatedContent }
+        snapshotFlow { updatedContent to streaming }
             .distinctUntilChanged()
-            .mapLatest { parseMarkdown(it) }
+            .mapLatest { (text, inProgress) ->
+                markdownCache[text] ?: parseMarkdown(text).also {
+                    if (!inProgress) markdownCache.put(text, it)
+                }
+            }
             .catch { exception -> exception.printStackTrace() }
-            .flowOn(Dispatchers.Default)
+            .flowOn(MarkdownParseDispatcher)
             .collect { setData(it) }
     }
 
-    if (data.hasHtml) {
+    val parsed = data
+    if (parsed == null) {
+        // A lightweight first frame while an uncached long message is parsed off the UI thread.
+        Text(content.take(512), modifier.padding(horizontal = 4.dp), style = style, maxLines = 8, overflow = TextOverflow.Ellipsis)
+    } else if (parsed.hasHtml) {
         MarkdownNew(
             content = content,
             modifier = modifier,
             style = style,
             onClickCitation = onClickCitation,
+            isStreaming = isStreaming,
         )
     } else {
         ProvideTextStyle(style) {
             Column(
                 modifier = modifier.padding(horizontal = 4.dp)
             ) {
-                data.astTree.children.fastForEach { child ->
+                parsed.astTree.children.fastForEach { child ->
                     MarkdownNode(
-                        node = child, content = data.preprocessed, onClickCitation = onClickCitation
+                        node = child, content = parsed.preprocessed, onClickCitation = onClickCitation
                     )
                 }
             }

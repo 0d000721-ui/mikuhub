@@ -16,6 +16,7 @@ class AndroidDeviceCommandBackend(
             state,
             if (state == ShizukuState.AUTHORIZED) runCatching { Shizuku.getUid() }.getOrNull() else null,
             manager.message.value,
+            rootRunner.status.value,
         )
     }
 

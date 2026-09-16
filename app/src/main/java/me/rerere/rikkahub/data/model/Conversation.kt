@@ -57,37 +57,30 @@ data class Conversation(
     }
 
     fun updateCurrentMessages(messages: List<UIMessage>): Conversation {
-        val newNodes = this.messageNodes.toMutableList()
-
+        var newNodes: MutableList<MessageNode>? = null
         messages.forEachIndexed { index, message ->
-            val node = newNodes
-                .getOrElse(index) { message.toMessageNode() }
-
+            val node = messageNodes.getOrNull(index)
+            if (node == null) {
+                val target = newNodes ?: messageNodes.toMutableList().also { newNodes = it }
+                target.add(message.toMessageNode())
+                return@forEachIndexed
+            }
+            val messageIndex = node.messages.indexOfFirst { it.id == message.id }
+            // Preserve history node identities so Compose can skip unchanged rows during streaming.
+            if (messageIndex >= 0 && node.messages[messageIndex] == message) return@forEachIndexed
             val newMessages = node.messages.toMutableList()
-            var newMessageIndex = node.selectIndex
-            if (newMessages.any { it.id == message.id }) {
-                newMessages[newMessages.indexOfFirst { it.id == message.id }] = message
+            if (messageIndex >= 0) {
+                newMessages[messageIndex] = message
             } else {
                 newMessages.add(message)
-                newMessageIndex = newMessages.lastIndex
             }
-
-            val newNode = node.copy(
+            val target = newNodes ?: messageNodes.toMutableList().also { newNodes = it }
+            target[index] = node.copy(
                 messages = newMessages,
-                selectIndex = newMessageIndex
+                selectIndex = if (messageIndex >= 0) node.selectIndex else newMessages.lastIndex,
             )
-
-            // 更新newNodes
-            if (index > newNodes.lastIndex) {
-                newNodes.add(newNode)
-            } else {
-                newNodes[index] = newNode
-            }
         }
-
-        return this.copy(
-            messageNodes = newNodes
-        )
+        return newNodes?.let { copy(messageNodes = it) } ?: this
     }
 
     companion object {
@@ -103,6 +96,27 @@ data class Conversation(
             newConversation = newConversation,
         )
     }
+}
+
+/** Most stream updates only change text. Scan the full retained history only for actual removal candidates. */
+internal fun Conversation.removedLocalFileUrls(
+    previous: Conversation,
+    additionallyRetained: () -> Set<String> = { emptySet() },
+): Set<String> {
+    if (messageNodes === previous.messageNodes) return emptySet()
+    val candidates = mutableSetOf<String>()
+    previous.messageNodes.forEachIndexed { index, oldNode ->
+        val newNode = messageNodes.getOrNull(index)
+        if (oldNode === newNode) return@forEachIndexed
+        val oldFiles = oldNode.messages.flatMap { it.parts }.localFileUrls()
+        if (oldFiles.isEmpty()) return@forEachIndexed
+        val replacementFiles = newNode?.messages?.flatMap { it.parts }?.localFileUrls().orEmpty()
+        candidates.addAll(oldFiles - replacementFiles)
+    }
+    if (candidates.isEmpty()) return emptySet()
+    candidates.removeAll(messageNodes.flatMap { it.messages }.flatMap { it.parts }.localFileUrls())
+    if (candidates.isNotEmpty()) candidates.removeAll(additionallyRetained())
+    return candidates
 }
 
 @Serializable

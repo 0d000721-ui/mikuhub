@@ -289,7 +289,13 @@ class StreamChunkHandler(private val model: Model? = null) {
 
             is StreamChunk.ImageEnd -> this.also { imagePartIndexes.remove(chunk.id) }
             is StreamChunk.Annotations -> copy(annotations = (annotations + chunk.annotations).distinct())
-            is StreamChunk.Usage -> copy(usage = usage.merge(chunk.usage))
+            is StreamChunk.Usage -> copy(
+                usage = usage.merge(chunk.usage),
+                requestContext = requestContext?.withUsage(
+                    usage = chunk.latestRequestUsage ?: chunk.usage.takeIf { chunk.requestCount == 1 },
+                    requestCount = chunk.requestCount,
+                ),
+            )
             is StreamChunk.Finish -> copy(
                 finishedAt = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
             ).finishReasoning().also {
@@ -336,6 +342,10 @@ fun List<UIMessage>.handleTextGenerationResult(
         dropLast(1) + last().appendMessage(incoming).copy(
             modelId = model?.id ?: last().modelId,
             usage = last().usage.merge(result.usage ?: TokenUsage()),
+            requestContext = last().requestContext?.withUsage(
+                usage = result.latestRequestUsage ?: result.usage.takeIf { result.requestCount == 1 },
+                requestCount = result.requestCount,
+            ),
             finishedAt = incoming.finishedAt,
         ).finishReasoning()
     }

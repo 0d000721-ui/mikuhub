@@ -11,3 +11,14 @@ local.properties
 .cursor
 .history
 .kotlin
+
+# Local credentials and generated packages
+**/build/
+*.apk
+*.aab
+*.jks
+*.keystore
+app/app.key
+**/google-services.json
+.env
+.env.*

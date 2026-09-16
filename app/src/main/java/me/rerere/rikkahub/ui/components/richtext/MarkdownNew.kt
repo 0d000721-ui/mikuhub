@@ -65,7 +65,6 @@ import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastForEach
 import androidx.core.graphics.toColorInt
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
@@ -81,6 +80,7 @@ import org.intellij.markdown.html.HtmlGenerator
 import org.intellij.markdown.parser.MarkdownParser
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
+import org.jsoup.nodes.Document
 import org.jsoup.nodes.Node
 import org.jsoup.nodes.TextNode
 
@@ -110,11 +110,12 @@ private val flavour by lazy {
     GFMFlavourDescriptor(makeHttpsAutoLinks = true, useSafeLinks = true)
 }
 
-private val parser by lazy { MarkdownParser(flavour) }
+private val parser = ThreadLocal.withInitial { MarkdownParser(flavour) }
+private val htmlCache = TextRenderCache<Document>()
 
 private fun generateMarkdownHtml(content: String): String {
     val preprocessed = preProcess(content)
-    val tree = parser.buildMarkdownTreeFromString(preprocessed)
+    val tree = checkNotNull(parser.get()).buildMarkdownTreeFromString(preprocessed)
     return HtmlGenerator(preprocessed, tree, flavour).generateHtml()
 }
 
@@ -126,30 +127,34 @@ fun MarkdownNew(
     modifier: Modifier = Modifier,
     style: TextStyle = LocalTextStyle.current,
     onClickCitation: (String) -> Unit = {},
+    isStreaming: Boolean = false,
 ) {
-    var html by remember {
-        mutableStateOf(
-            value = generateMarkdownHtml(content),
-        )
-    }
+    var document by remember { mutableStateOf(htmlCache[content]) }
 
     val updatedContent by rememberUpdatedState(content)
+    val streaming by rememberUpdatedState(isStreaming)
     LaunchedEffect(Unit) {
-        snapshotFlow { updatedContent }
+        snapshotFlow { updatedContent to streaming }
             .distinctUntilChanged()
-            .mapLatest { generateMarkdownHtml(it) }
+            .mapLatest { (text, inProgress) ->
+                htmlCache[text] ?: Jsoup.parse(generateMarkdownHtml(text)).also {
+                    if (!inProgress) htmlCache.put(text, it)
+                }
+            }
             .catch { it.printStackTrace() }
-            .flowOn(Dispatchers.Default)
-            .collect { html = it }
+            .flowOn(MarkdownParseDispatcher)
+            .collect { document = it }
     }
 
-    val document = remember(html) {
-        runCatching { Jsoup.parse(html) }.getOrElse { Jsoup.parse("") }
+    val parsed = document
+    if (parsed == null) {
+        Text(content.take(512), modifier.padding(start = 4.dp), style = style, maxLines = 8, overflow = TextOverflow.Ellipsis)
+        return
     }
 
     ProvideTextStyle(style) {
         Column(modifier = modifier.padding(start = 4.dp)) {
-            document.body().childNodes().fastForEach { node ->
+            parsed.body().childNodes().fastForEach { node ->
                 HtmlBodyNode(node = node, onClickCitation = onClickCitation)
             }
         }

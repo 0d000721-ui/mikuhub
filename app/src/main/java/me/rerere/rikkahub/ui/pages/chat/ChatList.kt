@@ -349,8 +349,7 @@ private fun ChatListNormal(
                             onShare = {
                                 selecting = true  // 使用 CoroutineScope 延迟状态更新
                                 selectedItems.clear()
-                                selectedItems.addAll(conversation.messageNodes.map { it.id }
-                                    .subList(0, conversation.messageNodes.indexOf(node) + 1))
+                                selectedItems.addAll(conversationUpdated.messageNodes.take(index + 1).map { it.id })
                             },
                             onUpdate = {
                                 onUpdateMessage(it)

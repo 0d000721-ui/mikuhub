@@ -1,8 +1,8 @@
 {
   "conversations": {
     "meta": {
-      "title": "RikkaHub Web",
-      "description": "RikkaHub web client"
+      "title": "MikuHub Web",
+      "description": "MikuHub web client"
     },
     "preview": {
       "empty_message": "Empty message",

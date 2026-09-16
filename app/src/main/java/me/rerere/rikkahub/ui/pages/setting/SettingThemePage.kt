@@ -79,6 +79,7 @@ import me.rerere.rikkahub.ui.pages.setting.components.PresetThemeButtonGroup
 import me.rerere.rikkahub.ui.theme.CustomColors
 import me.rerere.rikkahub.ui.theme.CustomTheme
 import me.rerere.rikkahub.ui.theme.LocalDarkMode
+import me.rerere.rikkahub.ui.theme.presets.MIKU_THEME_ID
 import me.rerere.rikkahub.utils.plus
 import org.koin.androidx.compose.koinViewModel
 import kotlin.math.roundToInt
@@ -294,7 +295,7 @@ fun SettingThemePage(vm: SettingVM = koinViewModel()) {
         onConfirm = {
             deletingTheme?.let { theme ->
                 val newThemes = settings.customThemes.filter { it.id != theme.id }
-                val newThemeId = if (settings.themeId == theme.id) "sakura" else settings.themeId
+                val newThemeId = if (settings.themeId == theme.id) MIKU_THEME_ID else settings.themeId
                 vm.updateSettings(settings.copy(customThemes = newThemes, themeId = newThemeId))
             }
             deletingTheme = null

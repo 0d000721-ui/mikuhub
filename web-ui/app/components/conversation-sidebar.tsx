@@ -1227,12 +1227,12 @@ export const ConversationSidebar = React.memo(
             </DropdownMenu>
 
             <a
-              href="https://rikka-ai.com"
+              href="https://github.com/0d000721-ui/mikuhub"
               target="_blank"
               rel="noopener noreferrer"
               className="ml-auto text-xs font-normal text-foreground/80 hover:text-foreground transition-colors"
             >
-              RikkaHub
+              MikuHub
             </a>
           </div>
         </SidebarFooter>

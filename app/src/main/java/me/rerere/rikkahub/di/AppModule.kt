@@ -22,6 +22,8 @@ import org.koin.dsl.module
 import me.rerere.rikkahub.device.ShizukuManager
 import me.rerere.rikkahub.device.DeviceAuditStore
 import me.rerere.rikkahub.device.DownloadInstallManager
+import me.rerere.rikkahub.device.ApkInstallManager
+import me.rerere.rikkahub.browser.AgentBrowserController
 import me.rerere.rikkahub.device.DebugCertificateStore
 import me.rerere.rikkahub.device.AndroidDeviceCommandBackend
 import me.rerere.rikkahub.device.DeviceCommandBackend
@@ -34,6 +36,7 @@ val appModule = module {
     single { ShizukuManager() }
     single { DeviceAuditStore(get()) }
     single { DownloadInstallManager(get()) }
+    single { AgentBrowserController(get(), get()) }
     single { DebugCertificateStore(get()) }
     single { me.rerere.rikkahub.device.DeviceAccessSession(get<DeviceAuditStore>()::append) }
     single { DeviceCommandConfirmations() }
@@ -41,6 +44,7 @@ val appModule = module {
     single { RootDeviceCommandRunner() }
     single<DeviceCommandBackend> { AndroidDeviceCommandBackend(get(), get(), get()) }
     single { DeviceCommandController(get(), get(), get()) }
+    single { ApkInstallManager(get(), get(), get(), get(), get(), get(), get()) }
     single<Json> { JsonInstant }
 
     single {
@@ -106,6 +110,9 @@ val appModule = module {
             mcpManager = get(),
             skillManager = get(),
             workspaceRepository = get(),
+            downloadManager = get(),
+            apkInstallManager = get(),
+            browserController = get(),
         )
     }
 

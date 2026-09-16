@@ -1,6 +1,7 @@
 package me.rerere.ai.provider.providers.claude
 
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonArray
@@ -32,6 +33,7 @@ import okhttp3.OkHttpClient
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.IOException
 
 class ClaudeServerToolTest {
     private val provider = ClaudeProvider(OkHttpClient())
@@ -302,6 +304,8 @@ class ClaudeServerToolTest {
         assertEquals(ServerToolStatus.COMPLETED, result.message.parts
             .filterIsInstance<UIMessagePart.ServerTool>().single().status)
         assertEquals(TokenUsage(15, 5, 0, 20), result.usage)
+        assertEquals(TokenUsage(5, 3, 0, 8), result.latestRequestUsage)
+        assertEquals(2, result.requestCount)
 
         val finalToolMetadata = result.message.parts
             .filterIsInstance<UIMessagePart.ServerTool>()
@@ -376,6 +380,8 @@ class ClaudeServerToolTest {
             TokenUsage(15, 5, 0, 20),
             chunks.filterIsInstance<StreamChunk.Usage>().last().usage,
         )
+        assertEquals(TokenUsage(5, 3, 0, 8), chunks.filterIsInstance<StreamChunk.Usage>().last().latestRequestUsage)
+        assertEquals(2, chunks.filterIsInstance<StreamChunk.Usage>().last().requestCount)
 
         val handler = StreamChunkHandler(model)
         val outputMessages = chunks.fold(listOf(UIMessage.user("search"))) { messages, chunk ->
@@ -397,6 +403,87 @@ class ClaudeServerToolTest {
             listOf("text", "server_tool_use", "web_search_tool_result", "text"),
             replayedContent?.map { it.jsonObject["type"]?.jsonPrimitive?.content },
         )
+    }
+
+    @Test
+    fun `streaming continuations report latest input separately from billed totals`() = runBlocking {
+        var pass = 0
+        val chunks = streamClaudeWithPauseTurn(listOf(UIMessage.user("search")), Model(modelId = "claude-test")) {
+            if (pass++ == 0) flowOf(
+                StreamChunk.Usage(TokenUsage(promptTokens = 100, completionTokens = 2, cachedTokens = 40)),
+                StreamChunk.Finish("pause_turn"),
+            ) else flowOf(
+                StreamChunk.Usage(TokenUsage(promptTokens = 120)),
+                StreamChunk.Usage(TokenUsage(completionTokens = 3)),
+                StreamChunk.Finish("end_turn"),
+            )
+        }.toList().filterIsInstance<StreamChunk.Usage>()
+
+        assertEquals(2, pass)
+        val reset = chunks.first { it.requestCount == 2 }
+        assertEquals(TokenUsage(), reset.latestRequestUsage)
+        assertEquals(100, reset.usage.promptTokens)
+        val final = chunks.last()
+        assertEquals(220, final.usage.promptTokens)
+        assertEquals(5, final.usage.completionTokens)
+        assertEquals(120, final.latestRequestUsage?.promptTokens)
+        assertEquals(3, final.latestRequestUsage?.completionTokens)
+        assertEquals(0, final.latestRequestUsage?.cachedTokens)
+        assertEquals(2, final.requestCount)
+    }
+
+    @Test
+    fun `streaming continuation without usage does not retain prior input snapshot`() = runBlocking {
+        var pass = 0
+        val chunks = streamClaudeWithPauseTurn(listOf(UIMessage.user("search")), Model(modelId = "claude-test")) {
+            if (pass++ == 0) flowOf(
+                StreamChunk.Usage(TokenUsage(promptTokens = 100)),
+                StreamChunk.Finish("pause_turn"),
+            ) else flowOf(StreamChunk.Finish("end_turn"))
+        }.toList().filterIsInstance<StreamChunk.Usage>()
+
+        assertEquals(100, chunks.last().usage.promptTokens)
+        assertEquals(TokenUsage(), chunks.last().latestRequestUsage)
+        assertEquals(2, chunks.last().requestCount)
+    }
+
+    @Test
+    fun `failed continuation clears latest input before the request starts`() = runBlocking {
+        var pass = 0
+        val seen = mutableListOf<StreamChunk>()
+        val failure = runCatching {
+            streamClaudeWithPauseTurn(listOf(UIMessage.user("search")), Model(modelId = "claude-test")) {
+                if (pass++ == 0) flowOf(
+                    StreamChunk.Usage(TokenUsage(promptTokens = 100)),
+                    StreamChunk.Finish("pause_turn"),
+                ) else flow { throw IOException("connection lost") }
+            }.toList(seen)
+        }.exceptionOrNull()
+
+        assertTrue(failure is IOException)
+        val latest = seen.filterIsInstance<StreamChunk.Usage>().last()
+        assertEquals(100, latest.usage.promptTokens)
+        assertEquals(TokenUsage(), latest.latestRequestUsage)
+        assertEquals(2, latest.requestCount)
+    }
+
+    @Test
+    fun `non streaming continuation with missing usage keeps latest request unknown`() = runBlocking {
+        var pass = 0
+        val result = generateClaudeWithPauseTurn(listOf(UIMessage.user("search")), Model(modelId = "claude-test")) {
+            val first = pass++ == 0
+            TextGenerationResult(
+                id = "pass_$pass",
+                model = "claude-test",
+                message = UIMessage(role = MessageRole.ASSISTANT, parts = listOf(UIMessagePart.Text("response"))),
+                finishReason = if (first) "pause_turn" else "end_turn",
+                usage = if (first) TokenUsage(promptTokens = 100, completionTokens = 2) else null,
+            )
+        }
+
+        assertEquals(100, result.usage?.promptTokens)
+        assertEquals(TokenUsage(), result.latestRequestUsage)
+        assertEquals(2, result.requestCount)
     }
 
     private fun buildRequest(

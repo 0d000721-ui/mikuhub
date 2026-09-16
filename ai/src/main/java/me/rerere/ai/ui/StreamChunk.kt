@@ -144,7 +144,13 @@ sealed class StreamChunk {
 
     @Serializable
     @SerialName("usage")
-    data class Usage(val usage: TokenUsage) : StreamChunk()
+    data class Usage(
+        val usage: TokenUsage,
+        // Providers that combine multiple requests retain billed totals in usage and expose
+        // the most recent request separately. An empty value means its usage is not known yet.
+        val latestRequestUsage: TokenUsage? = null,
+        val requestCount: Int = 1,
+    ) : StreamChunk()
 
     @Serializable
     @SerialName("finish")

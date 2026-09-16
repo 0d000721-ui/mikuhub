@@ -10,7 +10,12 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 
-data class DeviceBackendStatus(val shizukuState: ShizukuState, val shizukuUid: Int? = null, val detail: String? = null)
+data class DeviceBackendStatus(
+    val shizukuState: ShizukuState,
+    val shizukuUid: Int? = null,
+    val detail: String? = null,
+    val root: RootAccessStatus = RootAccessStatus(),
+)
 
 interface DeviceCommandBackend {
     suspend fun status(): DeviceBackendStatus
@@ -25,9 +30,10 @@ class DeviceCommandController(
     suspend fun status(): JsonObject {
         val backendStatus = backend.status()
         return buildJsonObject {
-            put("device", "the Android device running RikkaHub")
+            put("device", "the Android device running MikuHub")
             put("session_authorization", session.authorization.name)
             put("agent_stopped", session.stopped)
+            put("selected_transport", session.state.value.preferredTransport.name.lowercase())
             put("execution_allowed_by_session", !session.stopped && session.authorization != DeviceAuthorization.REVOKED)
             putJsonObject("shizuku") {
                 put("state", backendStatus.shizukuState.name)
@@ -38,10 +44,17 @@ class DeviceCommandController(
             }
             putJsonArray("available_transports") {
                 if (backendStatus.shizukuState == ShizukuState.AUTHORIZED) add("shizuku")
+                if (backendStatus.root.state == RootState.AUTHORIZED) add("root")
             }
             put("direct_adb_connection", false)
-            put("root", "Not probed. Explicit root selection requires on-device confirmation and the su manager's permission.")
-            put("usage", "Use device_command with transport=auto or shizuku for local Android shell commands. Shizuku started via wireless debugging supplies ADB shell privileges. Uninstall/clear always require on-device confirmation.")
+            putJsonObject("root") {
+                put("state", backendStatus.root.state.name)
+                put("last_verified_uid_0", backendStatus.root.state == RootState.AUTHORIZED)
+                put("detail", backendStatus.root.detail)
+                backendStatus.root.checkedAt?.let { put("checked_at", it) }
+                put("authorization", "Last verification only. Each root command rechecks UID 0 and requires device confirmation plus the su manager's permission.")
+            }
+            put("usage", "transport=auto uses selected_transport, chosen by the user in Device Control (default shizuku). If the user selected root, use it even when Shizuku is unavailable. No fallback between transports. Uninstall/clear always require on-device confirmation.")
         }
     }
 
@@ -54,7 +67,8 @@ class DeviceCommandController(
     ): JsonObject = withContext(Dispatchers.IO) {
         require(command.isNotBlank() && explanation.isNotBlank()) { "command 和 explanation 不能为空" }
         val transport = when (requestedTransport.lowercase()) {
-            "auto", "adb", "shizuku" -> DeviceTransport.SHIZUKU
+            "auto" -> session.state.value.preferredTransport
+            "adb", "shizuku" -> DeviceTransport.SHIZUKU
             "root" -> DeviceTransport.ROOT
             else -> error("不支持的 transport：$requestedTransport")
         }
@@ -64,6 +78,9 @@ class DeviceCommandController(
                 preview, transport,
                 runner = object : DeviceCommandRunner {
                     override suspend fun run(command: String): String {
+                        check(requestedTransport.lowercase() != "auto" || transport == session.state.value.preferredTransport) {
+                            "设备通道已改变，请重新发起请求"
+                        }
                         // Re-check the real transport after confirmation, not only when the tool was advertised.
                         if (transport == DeviceTransport.SHIZUKU) {
                             val status = backend.status()

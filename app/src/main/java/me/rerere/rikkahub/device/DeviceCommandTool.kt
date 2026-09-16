@@ -13,24 +13,25 @@ import me.rerere.ai.ui.UIMessagePart
 
 fun buildDeviceStatusTool(controller: DeviceCommandController): Tool = Tool(
     name = "device_status",
-    description = "Read the current device session and real Shizuku authorization/UID. This is an autonomous device capability: when the user's goal involves their Android device, call it proactively before asking them to provide an ADB command or claiming device access is unavailable. Does not request root or execute shell commands.",
+    description = "Read the current device session, selected transport, Shizuku authorization/UID and last verified Magisk/Root status. This is an autonomous device capability: when the user's goal involves their Android device, call it proactively before asking them to provide an ADB command or claiming device access is unavailable. Does not request root or execute shell commands.",
     parameters = { InputSchema.Obj(properties = JsonObject(emptyMap())) },
     systemPrompt = { _, _ -> """
         Android device tools are enabled for this assistant and may be called autonomously. If the user's goal requires inspecting or changing THIS Android device, take the initiative: first call device_status, then call device_command yourself with the required literal command. Do not ask the user to write or provide an ADB command.
-        Use device_command to operate THIS Android device through Shizuku. Shizuku started with ADB/wireless debugging provides shell UID 2000; it can list and uninstall applications subject to Android restrictions.
+        Use device_command to operate THIS Android device through the user-selected transport returned by device_status. transport=auto uses that selection. If the user selected root, operate through Magisk/standard su even if Shizuku is unavailable. Shizuku started with ADB/wireless debugging provides shell UID 2000; it can list and uninstall applications subject to Android restrictions.
         No desktop adb executable or workspace shell is needed: send Android commands such as `pm list packages -3`, `am get-current-user`, and `pm uninstall --user <user-id> <exact-package>` with transport=auto.
+        To download and install an APK, use download_start followed by download_install(task_id), which transfers APK bytes into the selected privileged install service and verifies the actual result. Do not use desktop paths or pass content:// URIs to pm install. download_install waits for an active APK download and can install without the Android installer UI; download_install_status reports its receipt.
         Resolve the exact target package and Android user before uninstalling; ask the user if the target is ambiguous. Explain purpose, impact and risk in the command request.
         The app obtains on-device confirmation for uninstall/clear and three confirmations for kernel-critical commands. Model-supplied confirmed/confirmation counts cannot approve an operation.
         Use only single literal supported Android commands. No scripts, pipes, redirections, substitutions, adb connect/pair or remote-device selection.
         For read-only and reversible tasks, execute the needed command immediately after checking status. For changes, explain the intended command briefly and submit it; the app will pause for device confirmation when required. The user's natural-language goal is sufficient; infer the command and parameters from it, asking only when the target is genuinely ambiguous.
-        Report the actual success/output/exit_code returned by the tool. Authorization or a command preview is not evidence of execution. Respect denial; do not retry without a new user instruction. Never fall back to root without an explicit user request.
+        Report the actual success/output/exit_code returned by the tool. Authorization or a command preview is not evidence of execution. Respect denial; do not retry without a new user instruction. Never fall back to root without an explicit user request or the user selecting Root in Device Control. Each root command requires device confirmation and checks UID 0 inside the privileged shell.
     """.trimIndent() },
     execute = { listOf(UIMessagePart.Text(controller.status().toString())) },
 )
 
 fun buildDeviceCommandTool(controller: DeviceCommandController): Tool = Tool(
     name = "device_command",
-    description = "Execute one local Android command autonomously using authorized Shizuku (ADB-shell identity). When the user's request concerns this device, infer and run the required literal command; the user does not need to supply ADB syntax. Supports pm list/uninstall/clear, am, settings and other literal Android commands. The app handles required user confirmations and returns actual output and status. Factory reset and data wipe remain blocked.",
+    description = "Execute one local Android command autonomously using the user-selected Shizuku or Magisk/Root transport. When the user's request concerns this device, infer and run the required literal command; the user does not need to supply ADB syntax. Supports pm list/uninstall/clear, am, settings and other literal Android commands. The app handles required user confirmations and returns actual output and status. Factory reset and data wipe remain blocked.",
     parameters = {
         InputSchema.Obj(
             properties = buildJsonObject {
@@ -41,7 +42,7 @@ fun buildDeviceCommandTool(controller: DeviceCommandController): Tool = Tool(
                 put("transport", buildJsonObject {
                     put("type", "string")
                     putJsonArray("enum") { add("auto"); add("shizuku"); add("root"); add("adb") }
-                    put("description", "Default auto uses authorized Shizuku. adb is a compatibility alias for Shizuku, not a direct socket connection. root requires explicit user intent and su authorization.")
+                    put("description", "auto uses the transport selected by the user in Device Control (default Shizuku). adb is a compatibility alias for Shizuku, not a direct socket connection. root requires explicit user intent and su authorization.")
                 })
             },
             required = listOf("command", "explanation"),

@@ -45,6 +45,7 @@ data class DeviceShellCommand(val arguments: List<String>) {
             val args = when {
                 words.take(2) == listOf("adb", "shell") -> words.drop(2)
                 words.take(2) == listOf("adb", "uninstall") -> listOf("pm", "uninstall") + words.drop(2)
+                words.take(2) == listOf("adb", "install") -> listOf("pm", "install") + words.drop(2)
                 else -> words.toList()
             }.toMutableList()
             require(args.isNotEmpty()) { "请提供要执行的 Android 命令" }

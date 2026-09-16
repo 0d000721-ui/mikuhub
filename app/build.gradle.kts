@@ -79,8 +79,18 @@ android {
         }
         debug {
             applicationIdSuffix = ".debug"
-            buildConfigField("String", "VERSION_NAME", "\"${android.defaultConfig.versionName}\"")
+            versionNameSuffix = "-miku.20260916.5"
+            buildConfigField("String", "VERSION_NAME", "\"${android.defaultConfig.versionName}-miku.20260916.5\"")
             buildConfigField("String", "VERSION_CODE", "\"${android.defaultConfig.versionCode}\"")
+        }
+        create("optimized") {
+            initWith(getByName("debug"))
+            isDebuggable = false
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release", "debug")
+            optimization { enable = true }
+            versionNameSuffix = "-miku.20260916.5"
+            buildConfigField("String", "VERSION_NAME", "\"${android.defaultConfig.versionName}-miku.20260916.5\"")
         }
     }
     compileOptions {
@@ -93,6 +103,10 @@ android {
     }
     sourceSets {
         getByName("androidTest").assets.srcDirs("$projectDir/schemas")
+        getByName("optimized") {
+            manifest.srcFile("src/debug/AndroidManifest.xml")
+            res.srcDir("src/debug/res")
+        }
     }
     androidResources {
         generateLocaleConfig = true

@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.IBinder
+import android.os.ParcelFileDescriptor
+import java.io.File
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -20,7 +22,24 @@ class ShizukuDeviceCommandRunner(context: Context) : DeviceCommandRunner {
     private var remote: IShizukuUserService? = null
     private var connection: ServiceConnection? = null
     private val args = Shizuku.UserServiceArgs(ComponentName(context, ShizukuUserService::class.java))
-        .tag("device-commands-v2").version(2).daemon(false).processNameSuffix("device").debuggable(false)
+        .tag("device-commands-v3").version(3).daemon(false).processNameSuffix("device").debuggable(false)
+
+    suspend fun installApk(file: File, size: Long, userId: Int): String = coroutineScope {
+        val service = service()
+        val execution = async(Dispatchers.IO) {
+            ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use {
+                service.installApk(it, size, userId)
+            }
+        }
+        try {
+            val result = withTimeoutOrNull(APK_INSTALL_TIMEOUT + 10_000) { execution.await() }
+                ?: throw DeviceShellException(DeviceShellResult(-1, "安装服务未返回结果，请检查安装状态后再决定是否重试", timedOut = true))
+            requireApkInstallSuccess(result.checkedOutput())
+        } finally {
+            if (!execution.isCompleted) runCatching { service.cancel() }
+            execution.cancel()
+        }
+    }
 
     private suspend fun service(): IShizukuUserService = bindMutex.withLock {
         withContext(Dispatchers.Main.immediate) {

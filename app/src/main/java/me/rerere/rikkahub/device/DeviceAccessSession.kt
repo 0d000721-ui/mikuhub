@@ -14,7 +14,11 @@ import kotlinx.coroutines.sync.withLock
 enum class DeviceTransport { ADB, SHIZUKU, ROOT }
 enum class DeviceAuthorization { ASK, SESSION, REVOKED }
 
-data class DeviceSessionState(val authorization: DeviceAuthorization = DeviceAuthorization.ASK, val stopped: Boolean = false)
+data class DeviceSessionState(
+    val authorization: DeviceAuthorization = DeviceAuthorization.ASK,
+    val stopped: Boolean = false,
+    val preferredTransport: DeviceTransport = DeviceTransport.SHIZUKU,
+)
 data class DeviceAuditEntry(
     val command: String,
     val transport: DeviceTransport,
@@ -40,15 +44,22 @@ class DeviceAccessSession(private val record: (DeviceAuditEntry) -> Unit = {}) {
     val state = _state.asStateFlow()
     val authorization get() = state.value.authorization
     val stopped get() = state.value.stopped
+    internal val accessVersion get() = synchronized(lock) { revision }
 
-    fun authorizeSession() = changeState(DeviceSessionState(DeviceAuthorization.SESSION))
-    fun revoke() = changeState(DeviceSessionState(DeviceAuthorization.REVOKED, stopped))
-    fun stop() = changeState(DeviceSessionState(DeviceAuthorization.REVOKED, true))
+    fun authorizeSession() = changeState { it.copy(authorization = DeviceAuthorization.SESSION, stopped = false) }
+    fun revoke() = changeState { it.copy(authorization = DeviceAuthorization.REVOKED) }
+    fun stop() = changeState { it.copy(authorization = DeviceAuthorization.REVOKED, stopped = true) }
 
-    private fun changeState(value: DeviceSessionState) {
+    /** Called from device settings; selection expires with the process. */
+    fun selectTransport(transport: DeviceTransport) {
+        require(transport == DeviceTransport.SHIZUKU || transport == DeviceTransport.ROOT)
+        changeState { it.copy(preferredTransport = transport) }
+    }
+
+    private fun changeState(transform: (DeviceSessionState) -> DeviceSessionState) {
         val job = synchronized(lock) {
             revision++
-            _state.value = value
+            _state.value = transform(_state.value)
             activeJob
         }
         job?.cancel(CancellationException("设备会话授权已改变"))

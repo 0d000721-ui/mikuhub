@@ -89,6 +89,7 @@ import me.rerere.hugeicons.stroke.Add01
 import me.rerere.hugeicons.stroke.ArrowUp02
 import me.rerere.hugeicons.stroke.Cancel01
 import me.rerere.hugeicons.stroke.Fullscreen
+import me.rerere.hugeicons.stroke.Internet
 import me.rerere.hugeicons.stroke.Zap
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.datastore.Settings
@@ -97,6 +98,7 @@ import me.rerere.rikkahub.data.datastore.getCurrentChatModel
 import me.rerere.rikkahub.data.datastore.getQuickMessagesOfAssistant
 import me.rerere.rikkahub.data.files.FilesManager
 import me.rerere.rikkahub.data.model.Assistant
+import me.rerere.rikkahub.data.model.Conversation
 import me.rerere.rikkahub.data.model.QuickMessage
 import me.rerere.rikkahub.service.MessageQueueState
 import me.rerere.rikkahub.service.QueuedMessage
@@ -105,6 +107,7 @@ import me.rerere.rikkahub.ui.components.ai.completion.ChatCompletionItem
 import me.rerere.rikkahub.ui.components.ai.completion.ChatCompletionList
 import me.rerere.rikkahub.ui.components.ai.completion.ChatCompletionProvider
 import me.rerere.rikkahub.ui.components.ui.KeepScreenOn
+import me.rerere.rikkahub.ui.components.ui.Tooltip
 import me.rerere.rikkahub.ui.components.ui.permission.PermissionManager
 import me.rerere.rikkahub.ui.components.ui.permission.PermissionRecordAudio
 import me.rerere.rikkahub.ui.components.ui.permission.rememberPermissionState
@@ -124,6 +127,7 @@ fun ChatInput(
     state: ChatInputState,
     loading: Boolean,
     settings: Settings,
+    conversation: Conversation,
     hazeState: HazeState,
     enableSearch: Boolean,
     onUpdateSearchMode: (SearchMode) -> Unit,
@@ -136,6 +140,9 @@ fun ChatInput(
     onCancelClick: () -> Unit,
     onSendClick: () -> Unit,
     onLongSendClick: () -> Unit,
+    onOpenContext: () -> Unit,
+    onOpenDownloads: () -> Unit,
+    onOpenBrowser: () -> Unit,
     messageQueue: MessageQueueState = MessageQueueState(),
     onRemoveQueuedMessage: (Uuid) -> Unit = {},
     onBeginEditQueuedMessage: (Uuid) -> QueuedMessage? = { null },
@@ -263,6 +270,14 @@ fun ChatInput(
                         onSendMessage = { sendMessage() },
                     )
 
+                    ChatModelStatusRow(
+                        modelState = modelListState,
+                        conversation = conversation,
+                        loading = loading,
+                        onOpenContext = onOpenContext,
+                        onOpenDownloads = onOpenDownloads,
+                    )
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -276,12 +291,15 @@ fun ChatInput(
                                 .horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
-                            // Model Picker
-                            ModelSelectorButton(
-                                state = modelListState,
-                                onlyIcon = true,
-                                modifier = Modifier,
-                            )
+                            Tooltip(tooltip = { Text("内置浏览器") }) {
+                                IconButton(onClick = onOpenBrowser) {
+                                    Icon(
+                                        imageVector = HugeIcons.Internet,
+                                        contentDescription = "打开内置浏览器",
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                }
+                            }
 
                             // Search
                             val enableSearchMsg = stringResource(R.string.web_search_enabled)

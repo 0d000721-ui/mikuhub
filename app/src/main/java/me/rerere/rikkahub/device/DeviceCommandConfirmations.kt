@@ -55,9 +55,13 @@ class DeviceCommandConfirmations(private val timeoutMillis: Long = 300_000) {
         }
     }
 
-    fun reject(id: Long) = synchronized(lock) {
+    fun reject(id: Long, reason: String = "") = synchronized(lock) {
         if (_pending.value?.id != id) return@synchronized
-        answer?.complete(0)
+        if (reason.isBlank()) {
+            answer?.complete(0)
+        } else {
+            answer?.completeExceptionally(DeviceCommandRejectedException("用户拒绝了本次操作：${reason.trim()}"))
+        }
         _pending.value = null
     }
 }

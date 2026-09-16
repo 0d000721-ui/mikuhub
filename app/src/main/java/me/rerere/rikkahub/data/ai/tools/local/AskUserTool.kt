@@ -10,8 +10,11 @@ import me.rerere.ai.core.Tool
 internal fun buildAskUserTool(): Tool = Tool(
     name = "ask_user",
     description = """
-        Ask the user one or more questions when you need clarification, additional information, or confirmation.
+        Ask the user one to three concise questions when you need clarification or additional information.
         Each question can optionally provide a list of suggested options for the user to choose from.
+        Prefer two or three short, mutually exclusive options for single selection. Use option_descriptions to explain tradeoffs.
+        Put the recommended option first and set recommended_option to its exact label. Do not add an Other option; the UI provides it.
+        Use a short header to label each question. Do not use this tool to bypass execution approval.
         The user may provide a free-text answer for every question, including single and multi selection questions.
         For multi selection questions, custom text can be combined with selected options.
         The answers will be returned as a JSON object mapping question IDs to the user's responses.
@@ -21,7 +24,9 @@ internal fun buildAskUserTool(): Tool = Tool(
             properties = buildJsonObject {
                 put("questions", buildJsonObject {
                     put("type", "array")
-                    put("description", "List of questions to ask the user")
+                    put("description", "One to three questions to ask the user")
+                    put("minItems", 1)
+                    put("maxItems", 3)
                     put("items", buildJsonObject {
                         put("type", "object")
                         put("properties", buildJsonObject {
@@ -32,6 +37,10 @@ internal fun buildAskUserTool(): Tool = Tool(
                             put("question", buildJsonObject {
                                 put("type", "string")
                                 put("description", "The question text to display to the user")
+                            })
+                            put("header", buildJsonObject {
+                                put("type", "string")
+                                put("description", "Optional short topic label, e.g. Theme or Install")
                             })
                             put("options", buildJsonObject {
                                 put("type", "array")
@@ -57,6 +66,15 @@ internal fun buildAskUserTool(): Tool = Tool(
                                     "description",
                                     "Answer type: text (free text input, default), single (select one option or enter custom text), multi (select options and/or enter custom text)"
                                 )
+                            })
+                            put("option_descriptions", buildJsonObject {
+                                put("type", "array")
+                                put("description", "Optional brief explanations, in the same order as options")
+                                put("items", buildJsonObject { put("type", "string") })
+                            })
+                            put("recommended_option", buildJsonObject {
+                                put("type", "string")
+                                put("description", "Optional exact label of the recommended option. Choosing or recommending an option never submits it automatically.")
                             })
                         })
                         put("required", buildJsonArray {

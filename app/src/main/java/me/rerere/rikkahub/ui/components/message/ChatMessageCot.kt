@@ -26,6 +26,7 @@ sealed interface ThinkingStep {
 sealed interface MessagePartBlock {
     data class ThinkingBlock(val steps: List<ThinkingStep>) : MessagePartBlock
     data class ContentBlock(val part: UIMessagePart, val index: Int) : MessagePartBlock
+    data class InteractionBlock(val tool: UIMessagePart.Tool) : MessagePartBlock
 }
 
 /**
@@ -50,7 +51,13 @@ fun List<UIMessagePart>.groupMessageParts(): List<MessagePartBlock> {
             }
 
             is UIMessagePart.Tool -> {
-                currentThinkingSteps.add(ThinkingStep.ToolStep(part))
+                if (part.isPending || part.toolName == "ask_user") {
+                    // User requests must remain visible even when the thought timeline is collapsed.
+                    flushThinkingSteps()
+                    result.add(MessagePartBlock.InteractionBlock(part))
+                } else {
+                    currentThinkingSteps.add(ThinkingStep.ToolStep(part))
+                }
             }
 
             is UIMessagePart.ServerTool -> {

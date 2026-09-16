@@ -38,9 +38,9 @@ private val DefaultSizeInfo = ConversationSizeInfo(
 fun rememberConversationSizeInfo(conversation: Conversation): ConversationSizeInfo {
     return remember(conversation.messageNodes) {
         val nodeCount = conversation.messageNodes.size
-        val lastAssistantInputTokens = conversation.messageNodes.asReversed()
-            .map { it.currentMessage }
-            .firstOrNull { it.role == MessageRole.ASSISTANT }
+        val lastAssistantInputTokens = conversation.messageNodes
+            .lastOrNull { it.currentMessage.role == MessageRole.ASSISTANT }
+            ?.currentMessage
             ?.usage
             ?.promptTokens
             ?: 0

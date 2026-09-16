@@ -1,0 +1,13 @@
+Generation method: built-in image_gen tool. The interface does not expose a model/version selector, so image2.5 cannot be independently verified.
+
+Use case: logo-brand.
+Asset type: final square Android app icon artwork, one single icon, 1024 x 1024.
+Primary request: A super cute big-head chibi Hatsune Miku mascot for an AI chat and agent tool. Instantly recognizable as both moe Miku and an AI assistant at small launcher-icon sizes.
+Subject: front-facing enormous rounded head, tiny suggestion of shoulders, distinctive turquoise twin tails, Miku bangs and black hair ornaments with small pink accents, large expressive teal anime eyes, tiny smiling mouth and subtle peach blush. Friendly, clever, approachable, adorable. Head dominates the design. Compact thick twin tails curve around the face as an iconic silhouette; do not use long thin strands or full-body composition.
+AI identity: a clean dark-teal rounded speech bubble tucked into the lower-right of the composition, large enough to read when reduced to an app icon, containing exactly the two uppercase letters "AI" in bold simple white sans-serif; one simple four-point AI sparkle accent incorporated beside the bubble. Small headset earpiece subtly integrates with Miku's established look. The face remains the primary focus.
+Style: polished high-quality kawaii mascot logo, clean vector-like 2D illustration, generous bold shapes, crisp dark-teal contours, very restrained soft cel shading, warm appealing expression. Designed as a memorable professional software icon, not a detailed anime poster. No heavy 3D render, no glossy plastic.
+Palette: signature Miku hair #39C5BB with lighter aqua highlights, deep teal #123F46 outlines and speech bubble, pale warm face, tiny coral-pink accents. Background is uniform very pale mint #EAF9F6, full bleed to every edge.
+Composition: centered balanced square; keep every essential feature including twin tails and AI bubble inside the central safe circle approximately 78% of the canvas diameter, with comfortable outer breathing room so circular, squircle and rounded-square launcher masks cannot clip the face or bubble. The head itself should still feel large and cute. No baked-in outer rounded-square border, no mockup device, no captions around the icon.
+Text (verbatim): "AI" only. No other lettering.
+Avoid: watermark, signature, extra mascots, whale, DeepSeek logo, busy circuitry, tiny unreadable details, photographic texture, adult styling, dark or ominous expression, borders, icon grids.
+Produce just one finished icon image.

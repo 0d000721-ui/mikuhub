@@ -8,6 +8,7 @@ import me.rerere.rikkahub.ui.theme.presets.ClaudeThemePreset
 import me.rerere.rikkahub.ui.theme.presets.MinimalThemePreset
 import me.rerere.rikkahub.ui.theme.presets.OceanThemePreset
 import me.rerere.rikkahub.ui.theme.presets.SakuraThemePreset
+import me.rerere.rikkahub.ui.theme.presets.MikuThemePreset
 import me.rerere.rikkahub.ui.theme.presets.SpringThemePreset
 
 data class PresetTheme(
@@ -23,6 +24,7 @@ data class PresetTheme(
 
 val PresetThemes by lazy {
     listOf(
+        MikuThemePreset,
         SakuraThemePreset,
         OceanThemePreset,
         SpringThemePreset,
@@ -34,7 +36,7 @@ val PresetThemes by lazy {
 }
 
 fun findPresetTheme(id: String): PresetTheme {
-    return PresetThemes.find { it.id == id } ?: SakuraThemePreset
+    return PresetThemes.find { it.id == id } ?: MikuThemePreset
 }
 
 fun findThemeById(id: String, customThemes: List<CustomTheme>): PresetTheme? {

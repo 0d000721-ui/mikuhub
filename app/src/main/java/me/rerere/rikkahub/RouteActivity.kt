@@ -125,6 +125,8 @@ import me.rerere.rikkahub.ui.pages.share.handler.ShareHandlerPage
 import me.rerere.rikkahub.ui.pages.stats.StatsPage
 import me.rerere.rikkahub.ui.pages.device.AuditPage
 import me.rerere.rikkahub.ui.pages.device.DeviceControlPage
+import me.rerere.rikkahub.ui.pages.device.CustomFeaturesPage
+import me.rerere.rikkahub.ui.pages.device.DevicePageScaffold
 import me.rerere.rikkahub.ui.pages.device.PerformancePage
 import me.rerere.rikkahub.ui.pages.device.UsageContextPage
 import me.rerere.rikkahub.ui.pages.device.DownloadPage
@@ -133,6 +135,7 @@ import me.rerere.rikkahub.ui.pages.device.MemoryDiagnosticsPage
 import me.rerere.rikkahub.ui.components.device.DeviceCommandConfirmationHost
 import me.rerere.rikkahub.ui.pages.translator.TranslatorPage
 import me.rerere.rikkahub.ui.pages.webview.WebViewPage
+import me.rerere.rikkahub.ui.pages.browser.AgentBrowserPage
 import me.rerere.rikkahub.ui.theme.LocalDarkMode
 import me.rerere.rikkahub.ui.theme.RikkahubTheme
 import me.rerere.rikkahub.utils.CrashHandler
@@ -538,25 +541,17 @@ class RouteActivity : ComponentActivity() {
                             entry<Screen.Stats> {
                                 StatsPage()
                             }
-                            entry<Screen.DeviceAudit> { AuditPage() }
-                            entry<Screen.DeviceControl> { DeviceControlPage() }
-                            entry<Screen.DevicePerformance> { PerformancePage() }
-                            entry<Screen.DeviceUsage> { UsageContextPage() }
-                            entry<Screen.DeviceDownload> { DownloadPage() }
-                            entry<Screen.DeviceTraffic> { TrafficDebugPage() }
-                            entry<Screen.DeviceMemory> { MemoryDiagnosticsPage() }
+                            entry<Screen.CustomFeatures> { CustomFeaturesPage() }
+                            entry<Screen.DeviceAudit> { DevicePageScaffold("操作记录") { AuditPage() } }
+                            entry<Screen.DeviceControl> { DevicePageScaffold("设备控制") { DeviceControlPage() } }
+                            entry<Screen.DevicePerformance> { DevicePageScaffold("性能采样") { PerformancePage() } }
+                            entry<Screen.DeviceUsage> { key -> DevicePageScaffold("上下文用量") { UsageContextPage(key.conversationId) } }
+                            entry<Screen.DeviceDownload> { DevicePageScaffold("下载管理") { DownloadPage() } }
+                            entry<Screen.AgentBrowser> { AgentBrowserPage() }
+                            entry<Screen.DeviceTraffic> { DevicePageScaffold("流量调试") { TrafficDebugPage() } }
+                            entry<Screen.DeviceMemory> { DevicePageScaffold("内存诊断") { MemoryDiagnosticsPage() } }
                         }
                     )
-                    if (BuildConfig.DEBUG) {
-                        Text(
-                            text = "[开发模式]",
-                            modifier = Modifier
-                                .align(Alignment.TopCenter)
-                                .padding(top = 4.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
-                        )
-                    }
                     AnimatedVisibility(
                         visible = migrationState is MigrationState.Migrating,
                         enter = fadeIn(),
@@ -748,15 +743,20 @@ sealed interface Screen : NavKey {
     @Serializable
     data object Stats : Screen
     @Serializable
+    data object CustomFeatures : Screen
+    @Serializable
     data object DeviceAudit : Screen
     @Serializable
     data object DeviceControl : Screen
     @Serializable
     data object DevicePerformance : Screen
     @Serializable
-    data object DeviceUsage : Screen
+    data class DeviceUsage(val conversationId: String? = null) : Screen
     @Serializable
     data object DeviceDownload : Screen
+
+    @Serializable
+    data object AgentBrowser : Screen
     @Serializable
     data object DeviceTraffic : Screen
     @Serializable

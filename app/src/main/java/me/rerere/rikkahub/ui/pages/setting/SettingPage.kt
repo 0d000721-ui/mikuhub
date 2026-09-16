@@ -139,6 +139,28 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
             contentPadding = innerPadding + PaddingValues(8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            item("sakuraFeatures") {
+                CardGroup(modifier = Modifier.padding(horizontal = 8.dp)) {
+                    item(
+                        onClick = { navController.navigate(Screen.CustomFeatures) },
+                        leadingContent = { Icon(HugeIcons.AiMagic, null) },
+                        headlineContent = { Text("扩展中心") },
+                        supportingContent = { Text("下载管理 · 上下文用量 · 设备控制") },
+                    )
+                    item(
+                        onClick = { navController.navigate(Screen.DeviceDownload) },
+                        leadingContent = { Icon(HugeIcons.Package, null) },
+                        headlineContent = { Text("下载管理") },
+                        supportingContent = { Text("查看下载进度与安装文件") },
+                    )
+                    item(
+                        onClick = { navController.navigate(Screen.DeviceUsage()) },
+                        leadingContent = { Icon(HugeIcons.Brain02, null) },
+                        headlineContent = { Text("上下文用量") },
+                        supportingContent = { Text("当前会话的输入、输出与缓存") },
+                    )
+                }
+            }
             if (settings.isNotConfigured()) {
                 item {
                     ProviderConfigWarningCard(navController)
@@ -256,33 +278,6 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
                     modifier = Modifier.padding(horizontal = 8.dp),
                     title = { Text(stringResource(R.string.setting_page_data_settings)) },
                 ) {
-                    item(
-                        onClick = { navController.navigate(Screen.DeviceAudit) },
-                        leadingContent = { Icon(HugeIcons.Alert01, null) },
-                        supportingContent = { Text("查看设备命令执行记录") },
-                        headlineContent = { Text("设备审计日志") },
-                    )
-                    item(
-                        onClick = { navController.navigate(Screen.DeviceControl) },
-                        leadingContent = { Icon(HugeIcons.Settings03, null) },
-                        supportingContent = { Text("Shizuku、会话授权和无障碍控制") },
-                        headlineContent = { Text("设备控制") },
-                    )
-                    item(
-                        onClick = { navController.navigate(Screen.DevicePerformance) },
-                        leadingContent = { Icon(HugeIcons.LookTop, null) },
-                        supportingContent = { Text("刷新率、CPU 频率和可用功耗信息") },
-                        headlineContent = { Text("性能监控") },
-                    )
-                    item(
-                        onClick = { navController.navigate(Screen.DeviceUsage) },
-                        leadingContent = { Icon(HugeIcons.Brain02, null) },
-                        supportingContent = { Text("Token、缓存命中率和上下文上限") },
-                        headlineContent = { Text("Token 与上下文统计") },
-                    )
-                    item(onClick = { navController.navigate(Screen.DeviceDownload) }, leadingContent = { Icon(HugeIcons.Package, null) }, supportingContent = { Text("下载并准备安装 APK") }, headlineContent = { Text("下载与安装") })
-                    item(onClick = { navController.navigate(Screen.DeviceTraffic) }, leadingContent = { Icon(HugeIcons.GlobalSearch, null) }, supportingContent = { Text("本地 VPN 流量调试和证书管理") }, headlineContent = { Text("流量调试") })
-                    item(onClick = { navController.navigate(Screen.DeviceMemory) }, leadingContent = { Icon(HugeIcons.Brain02, null) }, supportingContent = { Text("仅限自有或 debuggable 目标的只读诊断") }, headlineContent = { Text("内存诊断") })
                     item(
                         onClick = { navController.navigate(Screen.Backup) },
                         leadingContent = { Icon(HugeIcons.Database02, null) },

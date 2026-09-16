@@ -3,6 +3,8 @@ package me.rerere.rikkahub.device
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
+import java.io.InputStream
+import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.TimeUnit
 
 data class DeviceShellResult(
@@ -31,8 +33,12 @@ class DeviceShellExecutor(private val outputLimit: Int = 16_384) {
     @Volatile private var active: Execution? = null
     val isRunning: Boolean get() = active != null
 
-    fun execute(arguments: List<String>, directory: File? = null, timeoutMillis: Long = 30_000): DeviceShellResult {
+    fun execute(
+        arguments: List<String>, directory: File? = null, timeoutMillis: Long = 30_000,
+        standardInput: InputStream? = null, inputSize: Long? = null,
+    ): DeviceShellResult {
         require(timeoutMillis > 0 && outputLimit > 0)
+        require(standardInput == null || (inputSize != null && inputSize > 0))
         val execution = synchronized(lock) {
             check(active == null) { "Another device command is running" }
             Execution(ProcessBuilder(arguments).directory(directory).redirectErrorStream(true).start()).also { active = it }
@@ -42,6 +48,24 @@ class DeviceShellExecutor(private val outputLimit: Int = 16_384) {
         val buffer = ByteArray(4096)
         var truncated = false
         val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis)
+        val inputError = AtomicReference<Exception?>(null)
+        val writer = standardInput?.let { source ->
+            Thread({
+                try {
+                    source.use { input ->
+                        process.outputStream.use { output ->
+                            val inputBuffer = ByteArray(64 * 1024)
+                            var remaining = requireNotNull(inputSize)
+                            while (remaining > 0) {
+                                val count = input.read(inputBuffer, 0, minOf(inputBuffer.size.toLong(), remaining).toInt())
+                                if (count < 0) throw IOException("APK 数据不完整，还缺少 $remaining 字节")
+                                if (count > 0) { output.write(inputBuffer, 0, count); remaining -= count }
+                            }
+                        }
+                    }
+                } catch (error: Exception) { inputError.set(error) }
+            }, "device-apk-input").apply { isDaemon = true }
+        }
         fun readAvailable(): Int {
             val available = process.inputStream.available()
             if (available <= 0) return 0
@@ -53,11 +77,19 @@ class DeviceShellExecutor(private val outputLimit: Int = 16_384) {
             }
             return size
         }
-        fun result(exitCode: Int, timedOut: Boolean = false) = DeviceShellResult(
-            exitCode, bytes.toByteArray().toString(Charsets.UTF_8), timedOut, execution.cancelled, truncated,
-        )
+        fun result(exitCode: Int, timedOut: Boolean = false): DeviceShellResult {
+            if (exitCode == 0 && writer != null) writer.join(1_000)
+            val error = inputError.get()
+            val inputFailed = exitCode == 0 && (error != null || writer?.isAlive == true)
+            return DeviceShellResult(
+                if (inputFailed) -1 else exitCode,
+                bytes.toByteArray().toString(Charsets.UTF_8) +
+                    if (inputFailed) "\n安装数据传输未完成：${error?.message ?: "输入未被完整读取"}" else "",
+                timedOut, execution.cancelled, truncated,
+            )
+        }
         try {
-            process.outputStream.close() // Device tools are non-interactive.
+            if (writer == null) process.outputStream.close() else writer.start()
             while (true) {
                 if (Thread.currentThread().isInterrupted) throw InterruptedException("Device command interrupted")
                 if (execution.cancelled) return result(-1)
@@ -76,9 +108,11 @@ class DeviceShellExecutor(private val outputLimit: Int = 16_384) {
             throw error
         } finally {
             process.destroyForcibly()
+            runCatching { standardInput?.close() }
             runCatching { process.inputStream.close() }
             runCatching { process.outputStream.close() }
             runCatching { process.errorStream.close() }
+            writer?.interrupt()
             synchronized(lock) { if (active === execution) active = null }
         }
     }

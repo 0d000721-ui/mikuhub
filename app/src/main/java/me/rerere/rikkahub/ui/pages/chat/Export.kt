@@ -483,7 +483,7 @@ private fun ExportedChatImage(
                                 fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                             )
                             Text(
-                                text = "${LocalDateTime.now().toLocalString()}  rikka-ai.com",
+                                text = "${LocalDateTime.now().toLocalString()}  MikuHub · based on RikkaHub",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -549,6 +549,12 @@ private fun ExportedChatMessage(
         ) {
             groupedParts.forEach { block ->
                 when (block) {
+                    is MessagePartBlock.InteractionBlock -> {
+                        ChainOfThought(steps = listOf(block.tool)) { tool ->
+                            ExportedToolStep(tool = tool)
+                        }
+                    }
+
                     is MessagePartBlock.ThinkingBlock -> {
                         if (block.steps.isNotEmpty()) {
                             ChainOfThought(

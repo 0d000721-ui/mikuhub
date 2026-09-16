@@ -61,6 +61,9 @@ data class TextGenerationResult(
     val message: UIMessage,
     val finishReason: String? = null,
     val usage: TokenUsage? = null,
+    // Separate the latest provider request from totals accumulated by automatic continuations.
+    val latestRequestUsage: TokenUsage? = null,
+    val requestCount: Int = 1,
 )
 
 @Serializable
