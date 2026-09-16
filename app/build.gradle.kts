@@ -21,7 +21,7 @@ android {
         applicationId = "me.rerere.rikkahub"
         minSdk = 26
         targetSdk = 37
-        versionCode = 186
+        versionCode = 187
         versionName = "2.5.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -79,8 +79,8 @@ android {
         }
         debug {
             applicationIdSuffix = ".debug"
-            versionNameSuffix = "-miku.20260916.5"
-            buildConfigField("String", "VERSION_NAME", "\"${android.defaultConfig.versionName}-miku.20260916.5\"")
+            versionNameSuffix = "-miku.20260916.6-installfix"
+            buildConfigField("String", "VERSION_NAME", "\"${android.defaultConfig.versionName}-miku.20260916.6-installfix\"")
             buildConfigField("String", "VERSION_CODE", "\"${android.defaultConfig.versionCode}\"")
         }
         create("optimized") {
@@ -89,8 +89,8 @@ android {
             signingConfig = signingConfigs.getByName("debug")
             matchingFallbacks += listOf("release", "debug")
             optimization { enable = true }
-            versionNameSuffix = "-miku.20260916.5"
-            buildConfigField("String", "VERSION_NAME", "\"${android.defaultConfig.versionName}-miku.20260916.5\"")
+            versionNameSuffix = "-miku.20260916.6-installfix"
+            buildConfigField("String", "VERSION_NAME", "\"${android.defaultConfig.versionName}-miku.20260916.6-installfix\"")
         }
     }
     compileOptions {

@@ -31,6 +31,10 @@
 
 保留 RikkaHub 原有的多供应商模型接入、图片/文档输入、Markdown/代码/公式/Mermaid、工作区、MCP、搜索、助手配置、记忆、消息分支和 Web 访问等能力。
 
+## 最新修复
+
+- `20260916.6-installfix`：修复静默安装的 `Unknown option -` 错误，更新 Shizuku 服务版本，并将长错误日志折叠为可展开详情。见[修复说明](docs/fixes/2026-09-16-apk-install.md)。
+
 ## 下载与使用
 
 在 [Releases](https://github.com/0d000721-ui/mikuhub/releases) 下载 MikuHub APK。大多数手机使用 `arm64-v8a` 版本，最低 Android 8.0（API 26）。

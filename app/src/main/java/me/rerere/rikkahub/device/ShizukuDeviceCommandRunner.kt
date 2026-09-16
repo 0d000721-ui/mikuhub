@@ -22,7 +22,8 @@ class ShizukuDeviceCommandRunner(context: Context) : DeviceCommandRunner {
     private var remote: IShizukuUserService? = null
     private var connection: ServiceConnection? = null
     private val args = Shizuku.UserServiceArgs(ComponentName(context, ShizukuUserService::class.java))
-        .tag("device-commands-v3").version(3).daemon(false).processNameSuffix("device").debuggable(false)
+        // Keep the service identity, but replace v3 processes that still send a bare stdin "-".
+        .tag("device-commands-v3").version(4).daemon(false).processNameSuffix("device").debuggable(false)
 
     suspend fun installApk(file: File, size: Long, userId: Int): String = coroutineScope {
         val service = service()

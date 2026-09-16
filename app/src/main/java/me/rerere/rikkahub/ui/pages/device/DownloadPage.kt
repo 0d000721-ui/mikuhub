@@ -6,12 +6,16 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -52,6 +56,7 @@ import me.rerere.rikkahub.device.InstallLaunchResult
 import me.rerere.rikkahub.device.ApkInstallManager
 import me.rerere.rikkahub.device.ApkInstallation
 import me.rerere.rikkahub.device.ApkInstallStatus
+import me.rerere.rikkahub.device.apkInstallFailureSummary
 import me.rerere.rikkahub.Screen
 import me.rerere.rikkahub.AppScope
 import me.rerere.rikkahub.ui.context.LocalNavController
@@ -166,7 +171,7 @@ fun DownloadPage(
                     color = if (error != null || managerIssue != null) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer,
                     shape = RoundedCornerShape(16.dp),
                 ) {
-                    Text(message, Modifier.fillMaxWidth().padding(16.dp), style = MaterialTheme.typography.bodyMedium)
+                    DownloadResultText(message, Modifier.fillMaxWidth().padding(16.dp))
                 }
             }
         }
@@ -192,8 +197,8 @@ fun DownloadPage(
                     installation = installations[task.id],
                     enabled = !busy,
                     onSilentInstall = { act(background = true) {
-                        val result = installer.install(task.id)
-                        if (result.status == ApkInstallStatus.SUCCEEDED) notice = result.detail else error = result.detail
+                        // The task card observes its install result; avoid duplicating a full stack trace above the list.
+                        installer.install(task.id)
                     } },
                     onStopInstall = { installer.stop(task.id) },
                     onCancel = { act { manager.cancel(task.id) } },
@@ -272,7 +277,7 @@ private fun DownloadTaskCard(
                 ) {
                     Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         if (install.isActive) LinearProgressIndicator(Modifier.fillMaxWidth())
-                        Text(install.detail, style = MaterialTheme.typography.bodySmall)
+                        DownloadResultText(install.detail)
                         if (install.isActive) TextButton(onClick = onStopInstall) { Text("停止安装等待") }
                     }
                 }
@@ -289,6 +294,29 @@ private fun DownloadTaskCard(
                     task.status == DownloadStatus.READY -> TextButton(onClick = onOpen, enabled = enabled) { Text(if (task.isApk) "使用系统安装器" else "打开文件") }
                     task.status in setOf(DownloadStatus.FAILED, DownloadStatus.CANCELLED, DownloadStatus.MISSING) ->
                         FilledTonalButton(onClick = onRetry, enabled = enabled) { Text("重新下载") }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DownloadResultText(message: String, modifier: Modifier = Modifier) {
+    val summary = remember(message) { apkInstallFailureSummary(message) }
+    var expanded by rememberSaveable(message) { mutableStateOf(false) }
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(summary, style = MaterialTheme.typography.bodyMedium)
+        if (summary != message.trim()) {
+            TextButton(onClick = { expanded = !expanded }) {
+                Text(if (expanded) "收起详情" else "查看详情")
+            }
+            if (expanded) {
+                SelectionContainer {
+                    Text(
+                        message,
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 240.dp).verticalScroll(rememberScrollState()),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
             }
         }
