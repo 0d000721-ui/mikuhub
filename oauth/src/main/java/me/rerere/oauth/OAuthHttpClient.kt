@@ -57,6 +57,7 @@ class OAuthHttpClient(
         @SerialName("token_type") val tokenType: String = "Bearer",
         @SerialName("expires_in") val expiresIn: Long? = null,
         @SerialName("refresh_token") val refreshToken: String? = null,
+        @SerialName("id_token") val idToken: String? = null,
         val scope: String? = null,
     )
 

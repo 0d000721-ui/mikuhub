@@ -49,6 +49,7 @@ import kotlin.reflect.KClass
 fun ProviderConfigure(
     provider: ProviderSetting,
     modifier: Modifier = Modifier,
+    manageChatGptAccount: Boolean = true,
     onEdit: (provider: ProviderSetting) -> Unit
 ) {
     Column(
@@ -72,7 +73,7 @@ fun ProviderConfigure(
         }
 
         when (provider) {
-            is ProviderSetting.OpenAI -> ProviderConfigureOpenAI(provider, onEdit)
+            is ProviderSetting.OpenAI -> ProviderConfigureOpenAI(provider, onEdit, manageChatGptAccount)
             is ProviderSetting.Google -> ProviderConfigureGoogle(provider, onEdit)
             is ProviderSetting.Claude -> ProviderConfigureClaude(provider, onEdit)
         }
@@ -201,8 +202,13 @@ private val OFFICIAL_PROVIDER_HOSTS = setOf(
 @Composable
 private fun ProviderConfigureOpenAI(
     provider: ProviderSetting.OpenAI,
-    onEdit: (provider: ProviderSetting.OpenAI) -> Unit
+    onEdit: (provider: ProviderSetting.OpenAI) -> Unit,
+    manageChatGptAccount: Boolean,
 ) {
+    if (provider.chatGptAccountId != null) {
+        ChatGptProviderConfigure(provider, onEdit, manageChatGptAccount)
+        return
+    }
     val toaster = LocalToaster.current
 
     provider.description()

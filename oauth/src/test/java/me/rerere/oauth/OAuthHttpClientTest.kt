@@ -2,11 +2,27 @@ package me.rerere.oauth
 
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class OAuthHttpClientTest {
     private val client = OAuthHttpClient(OkHttpClient())
+
+    @Test
+    fun `token response retains id token for OIDC validation`() {
+        val json = Json { ignoreUnknownKeys = true }
+        val response = json.decodeFromString(
+            OAuthHttpClient.TokenResponse.serializer(),
+            """{"access_token":"access-fixture","id_token":"signed-id-fixture"}""",
+        )
+        val retained = json.parseToJsonElement(
+            json.encodeToString(OAuthHttpClient.TokenResponse.serializer(), response)
+        ).jsonObject
+        assertEquals("signed-id-fixture", retained["id_token"]?.jsonPrimitive?.content)
+    }
 
     @Test
     fun `authorization url contains pkce state scope and resources`() {

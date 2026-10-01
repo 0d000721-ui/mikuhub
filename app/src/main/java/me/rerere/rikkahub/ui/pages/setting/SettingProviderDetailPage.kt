@@ -145,16 +145,7 @@ fun SettingProviderDetailPage(id: Uuid, vm: SettingVM = koinViewModel()) {
     val context = LocalContext.current
 
     val onEdit = { newProvider: ProviderSetting ->
-        val newSettings = settings.copy(
-            providers = settings.providers.map {
-                if (newProvider.id == it.id) {
-                    newProvider
-                } else {
-                    it
-                }
-            }
-        )
-        vm.updateSettings(newSettings)
+        vm.updateProvider(newProvider)
     }
     val onDelete = {
         val newSettings = settings.copy(
@@ -279,7 +270,8 @@ private fun SettingProviderConfigPage(
             }
         )
 
-        if (internalProvider is ProviderSetting.OpenAI) {
+        if (internalProvider is ProviderSetting.OpenAI &&
+            (internalProvider as ProviderSetting.OpenAI).chatGptAccountId == null) {
             SettingProviderBalanceOption(
                 provider = internalProvider,
                 balanceOption = internalProvider.balanceOption,
@@ -1542,6 +1534,7 @@ private fun ProviderOverrideSettings(
                     ) {
                         ProviderConfigure(
                             provider = internalProvider,
+                            manageChatGptAccount = false,
                             onEdit = { internalProvider = it }
                         )
                     }

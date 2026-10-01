@@ -9,6 +9,7 @@ import kotlinx.coroutines.launch
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.ai.mcp.McpManager
+import me.rerere.ai.provider.ProviderSetting
 
 class SettingVM(
     private val settingsStore: SettingsStore,
@@ -21,6 +22,16 @@ class SettingVM(
     fun updateSettings(settings: Settings) {
         viewModelScope.launch {
             settingsStore.update(settings)
+        }
+    }
+
+    fun updateProvider(provider: ProviderSetting) {
+        viewModelScope.launch {
+            settingsStore.update { current ->
+                current.copy(providers = current.providers.map {
+                    if (it.id == provider.id) provider else it
+                })
+            }
         }
     }
 }

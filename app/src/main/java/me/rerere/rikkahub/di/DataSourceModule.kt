@@ -11,6 +11,8 @@ import me.rerere.common.http.AcceptLanguageBuilder
 import me.rerere.rikkahub.BuildConfig
 import me.rerere.rikkahub.data.ai.AIRequestInterceptor
 import me.rerere.rikkahub.data.ai.RequestLoggingInterceptor
+import me.rerere.rikkahub.data.ai.chatgpt.ChatGptAccountManager
+import me.rerere.rikkahub.ui.pages.setting.components.ChatGptProviderConnector
 import me.rerere.rikkahub.data.ai.transformers.AssistantTemplateLoader
 import me.rerere.rikkahub.data.ai.GenerationLoop
 import me.rerere.rikkahub.data.ai.TranslationHandler
@@ -180,7 +182,10 @@ val dataSourceModule = module {
             .addNetworkInterceptor(RequestLoggingInterceptor())
             .addInterceptor(AIRequestInterceptor())
             .addInterceptor(HttpLoggingInterceptor().apply {
+                redactHeader("Authorization")
                 redactHeader("Proxy-Authorization")
+                redactHeader("Cookie")
+                redactHeader("Set-Cookie")
                 level = HttpLoggingInterceptor.Level.HEADERS
             })
             .build()
@@ -192,8 +197,27 @@ val dataSourceModule = module {
     }
 
     single {
-        ProviderManager(client = get(), context = get())
+        val settingsStore = get<SettingsStore>()
+        ChatGptAccountManager(
+            context = get(),
+            appScope = get(),
+            authHttpClient = OkHttpClient.Builder()
+                .proxySelector(SettingsProxySelector(settingsStore))
+                .proxyAuthenticator(SettingsProxyAuthenticator(settingsStore))
+                .connectTimeout(20, TimeUnit.SECONDS)
+                .callTimeout(30, TimeUnit.SECONDS)
+                .followRedirects(false)
+                .followSslRedirects(false)
+                .build(),
+        )
     }
+
+    single {
+        val accounts = get<ChatGptAccountManager>()
+        ProviderManager(client = get(), context = get(), openAiSettingResolver = accounts::resolveProvider)
+    }
+
+    single { ChatGptProviderConnector(settingsStore = get(), providers = get()) }
 
     single { BackupManager(context = get(), database = get(), settingsStore = get(), json = get()) }
 

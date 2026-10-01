@@ -17,11 +17,16 @@ android {
     namespace = "me.rerere.rikkahub"
     compileSdk = 37
 
+    lint {
+        // Existing findings verified against 4ad506e6; new errors remain build failures.
+        baseline = file("lint-baseline.xml")
+    }
+
     defaultConfig {
         applicationId = "me.rerere.rikkahub"
         minSdk = 26
         targetSdk = 37
-        versionCode = 187
+        versionCode = 188
         versionName = "2.5.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -79,8 +84,8 @@ android {
         }
         debug {
             applicationIdSuffix = ".debug"
-            versionNameSuffix = "-miku.20260916.6-installfix"
-            buildConfigField("String", "VERSION_NAME", "\"${android.defaultConfig.versionName}-miku.20260916.6-installfix\"")
+            versionNameSuffix = "-miku.20261001.7-codex"
+            buildConfigField("String", "VERSION_NAME", "\"${android.defaultConfig.versionName}-miku.20261001.7-codex\"")
             buildConfigField("String", "VERSION_CODE", "\"${android.defaultConfig.versionCode}\"")
         }
         create("optimized") {
@@ -89,8 +94,8 @@ android {
             signingConfig = signingConfigs.getByName("debug")
             matchingFallbacks += listOf("release", "debug")
             optimization { enable = true }
-            versionNameSuffix = "-miku.20260916.6-installfix"
-            buildConfigField("String", "VERSION_NAME", "\"${android.defaultConfig.versionName}-miku.20260916.6-installfix\"")
+            versionNameSuffix = "-miku.20261001.7-codex"
+            buildConfigField("String", "VERSION_NAME", "\"${android.defaultConfig.versionName}-miku.20261001.7-codex\"")
         }
     }
     compileOptions {

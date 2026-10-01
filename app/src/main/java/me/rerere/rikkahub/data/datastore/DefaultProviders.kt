@@ -18,6 +18,16 @@ val DEFAULT_AUTO_MODEL_ID = Uuid.parse("b7055fb4-39f9-4042-a88a-0d80ed76cf08")
 
 val DEFAULT_PROVIDERS = listOf(
     ProviderSetting.OpenAI(
+        id = Uuid.parse("a78b8470-956b-4dc6-8fe9-84f8ea8ed3d1"),
+        name = "Codex / ChatGPT",
+        baseUrl = "https://api.openai.com/v1",
+        useResponseApi = true,
+        responsesPath = "/responses",
+        chatGptAccountId = "",
+        builtIn = true,
+        shortDescription = { Text("使用 ChatGPT 账户登录 · Codex 模型") },
+    ),
+    ProviderSetting.OpenAI(
         id = Uuid.parse("1eeea727-9ee5-4cae-93e6-6fb01a4d051e"),
         name = "OpenAI",
         baseUrl = "https://api.openai.com/v1",

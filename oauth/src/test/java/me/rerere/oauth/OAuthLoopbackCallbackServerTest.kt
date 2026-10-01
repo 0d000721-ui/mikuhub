@@ -28,7 +28,7 @@ class OAuthLoopbackCallbackServerTest {
                 session.awaitCallback(2.seconds).also { session.close() }
             }
             withContext(Dispatchers.IO) {
-                execute("${session.redirectUri}?code=auth-code&state=expected-state").use { response ->
+                execute("${session.redirectUri}?code=auth-code&state=expected-state&client_id=oaiapp_fixture").use { response ->
                     assertEquals(200, response.code)
                     assertTrue(response.body.string().contains("Authorization complete"))
                 }
@@ -37,6 +37,7 @@ class OAuthLoopbackCallbackServerTest {
             val callback = callbackAndClose.await()
             assertEquals("auth-code", callback?.code)
             assertEquals("expected-state", callback?.state)
+            assertEquals("oaiapp_fixture", callback?.clientId)
             assertFalse(callback?.error != null)
         } finally {
             session.close()

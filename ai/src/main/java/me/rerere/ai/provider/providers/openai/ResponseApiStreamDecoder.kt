@@ -17,25 +17,41 @@ import me.rerere.ai.ui.ServerToolStatus
 import me.rerere.ai.ui.StreamChunk
 import me.rerere.ai.ui.toMetadata
 import me.rerere.ai.util.json
+import me.rerere.ai.util.HttpException
 import me.rerere.ai.util.parseErrorDetail
 import me.rerere.common.http.jsonObjectOrNull
+import java.io.IOException
 
-internal class ResponseApiStreamDecoder : StreamChunkDecoder {
+internal class ResponseApiStreamDecoder(private val requireCompletedEvent: Boolean = false) : StreamChunkDecoder {
     private val state = ResponseStreamState()
+    private var receivedCompletedEvent = false
 
     override fun accept(event: SseEvent): DecodeResult {
         if (state.finished) return DecodeResult(completed = true)
-        if (event.data == "[DONE]") return DecodeResult(state.finish(), completed = true)
+        if (event.data == "[DONE]") {
+            ensureCompletedEvent()
+            return DecodeResult(state.finish(), completed = true)
+        }
 
         val payload = json.parseToJsonElement(event.data).jsonObject
         val eventType = payload["type"]?.jsonPrimitive?.contentOrNull
         val chunks = parseEvent(payload)
-        val completed = eventType == "response.completed" || eventType == "response.incomplete" ||
-            event.event == "response.completed" || event.event == "response.incomplete"
+        val completed = if (requireCompletedEvent) receivedCompletedEvent else
+            eventType == "response.completed" || eventType == "response.incomplete" ||
+                event.event == "response.completed" || event.event == "response.incomplete"
         return DecodeResult(chunks, completed)
     }
 
-    override fun onClosed(): List<StreamChunk> = state.finish()
+    override fun onClosed(): List<StreamChunk> {
+        ensureCompletedEvent()
+        return state.finish()
+    }
+
+    private fun ensureCompletedEvent() {
+        if (requireCompletedEvent && !receivedCompletedEvent) {
+            throw IOException("ChatGPT 响应流结束时未收到 response.completed")
+        }
+    }
 
     private fun parseEvent(payload: JsonObject): List<StreamChunk> {
         val chunkType = payload["type"]?.jsonPrimitive?.content ?: error("chunk type not found")
@@ -189,6 +205,14 @@ internal class ResponseApiStreamDecoder : StreamChunkDecoder {
             status
         }
 
+        if (requireCompletedEvent) {
+            if (payload["type"]?.jsonPrimitive?.contentOrNull != "response.completed" || status != "completed") {
+                state.abort()
+                throw HttpException("ChatGPT 响应未完成：${finishReason ?: "unknown"}")
+            }
+            receivedCompletedEvent = true
+        }
+
         return buildList {
             parseUsage(response?.get("usage") as? JsonObject)?.let { add(StreamChunk.Usage(it)) }
             addAll(state.finish(
@@ -208,6 +232,10 @@ internal class ResponseApiStreamDecoder : StreamChunkDecoder {
 
     private fun failWithError(error: JsonElement): Nothing {
         state.abort()
+        if (requireCompletedEvent) {
+            val code = error.jsonObjectOrNull?.get("code")?.jsonPrimitive?.contentOrNull
+            if (!code.isNullOrBlank()) throw HttpException("$code: ${error.parseErrorDetail().message}")
+        }
         throw error.parseErrorDetail()
     }
 

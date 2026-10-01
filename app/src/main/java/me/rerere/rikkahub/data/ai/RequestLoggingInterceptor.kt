@@ -64,7 +64,10 @@ class RequestLoggingInterceptor : Interceptor {
 
     private fun okhttp3.Headers.toMap(): Map<String, String> {
         return names().associateWith { name ->
-            if (name.equals("Proxy-Authorization", ignoreCase = true)) {
+            if (name.equals("Proxy-Authorization", ignoreCase = true) ||
+                name.equals("Authorization", ignoreCase = true) ||
+                name.equals("Cookie", ignoreCase = true) ||
+                name.equals("Set-Cookie", ignoreCase = true)) {
                 "██"
             } else {
                 get(name) ?: ""

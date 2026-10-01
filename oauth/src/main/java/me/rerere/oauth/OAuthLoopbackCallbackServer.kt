@@ -28,6 +28,7 @@ data class OAuthCallback(
     val state: String,
     val error: String?,
     val errorDescription: String?,
+    val clientId: String? = null,
 )
 
 /**
@@ -165,6 +166,7 @@ class OAuthLoopbackCallbackServer(
             state = state,
             error = error,
             errorDescription = call.request.queryParameters["error_description"],
+            clientId = call.request.queryParameters["client_id"],
         )
         val responseHtml = if (error == null) successHtml() else errorHtml()
         if (!registration.claimed.compareAndSet(false, true)) {
@@ -233,11 +235,11 @@ class OAuthLoopbackCallbackServer(
         title = localizedString(R.string.oauth_callback_success_title, "Authorization complete"),
         message = localizedString(
             R.string.oauth_callback_success_message,
-            "The account has been connected successfully.",
+            "Browser authorization received. Return to MikuHub to verify the account.",
         ),
         hint = localizedString(
             R.string.oauth_callback_success_hint,
-            "You can close this tab and return to RikkaHub.",
+            "You can close this tab and return to MikuHub.",
         ),
     )
 
@@ -251,7 +253,7 @@ class OAuthLoopbackCallbackServer(
         ),
         hint = localizedString(
             R.string.oauth_callback_error_hint,
-            "Close this tab and try again from RikkaHub.",
+            "Close this tab and try again from MikuHub.",
         ),
     )
 
@@ -268,7 +270,7 @@ class OAuthLoopbackCallbackServer(
         ),
         hint = localizedString(
             R.string.oauth_callback_invalid_hint,
-            "Return to RikkaHub and start the authorization again.",
+            "Return to MikuHub and start the authorization again.",
         ),
     )
 
@@ -285,7 +287,7 @@ class OAuthLoopbackCallbackServer(
         ),
         hint = localizedString(
             R.string.oauth_callback_handled_hint,
-            "You can safely close this tab and return to RikkaHub.",
+            "You can safely close this tab and return to MikuHub.",
         ),
     )
 
@@ -317,7 +319,7 @@ class OAuthLoopbackCallbackServer(
               <meta charset="utf-8">
               <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
               <meta name="color-scheme" content="light dark">
-              <title>$safeTitle · RikkaHub</title>
+              <title>$safeTitle · MikuHub</title>
               <style>
                 :root {
                   color-scheme: light dark;
@@ -406,7 +408,7 @@ class OAuthLoopbackCallbackServer(
             </head>
             <body class="$tone">
               <main role="status" aria-live="polite">
-                <p class="brand">RikkaHub</p>
+                <p class="brand">MikuHub</p>
                 <div class="status">
                   <div class="icon" aria-hidden="true">$symbol</div>
                   <h1>$safeTitle</h1>

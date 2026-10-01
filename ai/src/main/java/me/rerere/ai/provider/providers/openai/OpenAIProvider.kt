@@ -23,6 +23,7 @@ import me.rerere.ai.provider.Provider
 import me.rerere.ai.provider.ProviderSetting
 import me.rerere.ai.provider.TextGenerationResult
 import me.rerere.ai.provider.TextGenerationParams
+import me.rerere.ai.registry.ModelRegistry
 import me.rerere.ai.ui.ImageGenerationItem
 import me.rerere.ai.ui.StreamChunk
 import me.rerere.ai.ui.UIMessage
@@ -47,44 +48,62 @@ private const val TAG = "OpenAIProvider"
 
 class OpenAIProvider(
     private val client: OkHttpClient,
-    context: Context? = null
+    context: Context? = null,
+    private val settingResolver: (suspend (ProviderSetting.OpenAI) -> ProviderSetting.OpenAI)? = null,
 ) : Provider<ProviderSetting.OpenAI> {
     private val keyRoulette = if (context != null) KeyRoulette.lru(context) else KeyRoulette.default()
 
     private val chatCompletionsAPI = ChatCompletionsAPI(client = client, keyRoulette = keyRoulette)
     private val responseAPI = ResponseAPI(client = client, keyRoulette = keyRoulette)
 
+    private suspend fun resolveSetting(setting: ProviderSetting.OpenAI): ProviderSetting.OpenAI {
+        if (setting.chatGptAccountId == null) return setting
+        val resolved = settingResolver?.invoke(setting) ?: setting
+        return normalizeChatGptProvider(resolved.copy(id = setting.id, chatGptAccountId = setting.chatGptAccountId))
+    }
+
 
     override suspend fun listModels(providerSetting: ProviderSetting.OpenAI): List<Model> =
         withContext(Dispatchers.IO) {
-            val key = keyRoulette.next(providerSetting.apiKey, providerSetting.id.toString())
+            val setting = resolveSetting(providerSetting)
+            val key = openAIBearer(setting, keyRoulette)
             val request = Request.Builder()
-                .url("${providerSetting.baseUrl}/models")
-                .addHeader("Authorization", "Bearer $key")
+                .url("${setting.baseUrl}/models")
+                .header("Authorization", "Bearer $key")
                 .get()
                 .build()
 
-            val response = client.newCall(request).await()
-            if (!response.isSuccessful) {
-                error("Failed to get models: ${response.code} ${response.body?.string()}")
-            }
-
-            val bodyStr = response.body?.string() ?: ""
-            val bodyJson = json.parseToJsonElement(bodyStr).jsonObject
-            val data = bodyJson["data"]?.jsonArray ?: return@withContext emptyList()
-
-            data.mapNotNull { modelJson ->
-                val modelObj = modelJson.jsonObject
-                val id = modelObj["id"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-
-                Model(
-                    modelId = id,
-                    displayName = id,
-                )
+            withOpenAIResponse(setting, client.newCall(request)) { response ->
+                if (!response.isSuccessful) {
+                    error("Failed to get models: ${response.code} ${response.body.string()}")
+                }
+                val bodyJson = json.parseToJsonElement(response.body.string()).jsonObject
+                if (setting.chatGptAccountId != null) {
+                    val catalog = bodyJson["models"]?.jsonArray ?: error("ChatGPT 模型列表缺少 models 数组")
+                    catalog.mapNotNull { entry ->
+                        val model = entry.jsonObject
+                        if (model["visibility"]?.jsonPrimitive?.contentOrNull != "list") return@mapNotNull null
+                        val slug = model["slug"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+                            ?: return@mapNotNull null
+                        Model(
+                            modelId = slug,
+                            displayName = model["display_name"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank) ?: slug,
+                            inputModalities = ModelRegistry.MODEL_INPUT_MODALITIES.getData(slug),
+                            outputModalities = ModelRegistry.MODEL_OUTPUT_MODALITIES.getData(slug),
+                            abilities = ModelRegistry.MODEL_ABILITIES.getData(slug),
+                        )
+                    }
+                } else {
+                    bodyJson["data"]?.jsonArray.orEmpty().mapNotNull { modelJson ->
+                        val id = modelJson.jsonObject["id"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+                        Model(modelId = id, displayName = id)
+                    }
+                }
             }
         }
 
     override suspend fun getBalance(providerSetting: ProviderSetting.OpenAI): String = withContext(Dispatchers.IO) {
+        requireApiKeyAuthentication(providerSetting, "余额查询")
         val key = keyRoulette.next(providerSetting.apiKey, providerSetting.id.toString())
         val url = if (providerSetting.balanceOption.apiPath.startsWith("http")) {
             providerSetting.balanceOption.apiPath
@@ -116,42 +135,33 @@ class OpenAIProvider(
         providerSetting: ProviderSetting.OpenAI,
         messages: List<UIMessage>,
         params: TextGenerationParams
-    ): Flow<StreamChunk> = if (providerSetting.useResponseApi) {
-        responseAPI.streamText(
-            providerSetting = providerSetting,
-            messages = messages,
-            params = params
-        )
-    } else {
-        chatCompletionsAPI.streamText(
-            providerSetting = providerSetting,
-            messages = messages,
-            params = params
-        )
+    ): Flow<StreamChunk> {
+        val setting = resolveSetting(providerSetting)
+        return if (setting.useResponseApi) {
+            responseAPI.streamText(setting, messages, params)
+        } else {
+            chatCompletionsAPI.streamText(setting, messages, params)
+        }
     }
 
     override suspend fun generateText(
         providerSetting: ProviderSetting.OpenAI,
         messages: List<UIMessage>,
         params: TextGenerationParams
-    ): TextGenerationResult = if (providerSetting.useResponseApi) {
-        responseAPI.generateText(
-            providerSetting = providerSetting,
-            messages = messages,
-            params = params
-        )
-    } else {
-        chatCompletionsAPI.generateText(
-            providerSetting = providerSetting,
-            messages = messages,
-            params = params
-        )
+    ): TextGenerationResult {
+        val setting = resolveSetting(providerSetting)
+        return if (setting.useResponseApi) {
+            responseAPI.generateText(setting, messages, params)
+        } else {
+            chatCompletionsAPI.generateText(setting, messages, params)
+        }
     }
 
     override suspend fun generateEmbedding(
         providerSetting: ProviderSetting.OpenAI,
         params: EmbeddingGenerationParams
     ): EmbeddingGenerationResult = withContext(Dispatchers.IO) {
+        requireApiKeyAuthentication(providerSetting, "Embedding")
         require(params.input.isNotEmpty()) { "Embedding input cannot be empty" }
 
         val key = keyRoulette.next(providerSetting.apiKey, providerSetting.id.toString())
@@ -206,6 +216,7 @@ class OpenAIProvider(
         require(providerSetting is ProviderSetting.OpenAI) {
             "Expected OpenAI provider setting"
         }
+        requireApiKeyAuthentication(providerSetting, "独立图片生成")
 
         val key = keyRoulette.next(providerSetting.apiKey, providerSetting.id.toString())
 
@@ -254,6 +265,7 @@ class OpenAIProvider(
         require(providerSetting is ProviderSetting.OpenAI) {
             "Expected OpenAI provider setting"
         }
+        requireApiKeyAuthentication(providerSetting, "独立图片编辑")
         require(params.images.isNotEmpty()) {
             "At least one image is required"
         }

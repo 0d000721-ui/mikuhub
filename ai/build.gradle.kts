@@ -7,6 +7,7 @@ plugins {
 
 android {
     namespace = "me.rerere.ai"
+    testOptions.unitTests.isReturnDefaultValues = true
 
     defaultConfig {
 //        externalNativeBuild {
@@ -49,6 +50,7 @@ dependencies {
 
     // tests
     testImplementation(libs.junit)
+    testImplementation("com.squareup.okhttp3:mockwebserver:${libs.versions.okhttp.get()}")
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 }

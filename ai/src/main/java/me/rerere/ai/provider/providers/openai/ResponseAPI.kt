@@ -8,6 +8,7 @@ import kotlinx.coroutines.channels.onFailure
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -39,6 +40,7 @@ import me.rerere.ai.provider.providers.PartGroup
 import me.rerere.ai.provider.providers.groupPartsByToolBoundary
 import me.rerere.ai.registry.ModelRegistry
 import me.rerere.ai.ui.StreamChunk
+import me.rerere.ai.ui.StreamChunkHandler
 import me.rerere.ai.ui.OpenAIReasoningMetadata
 import me.rerere.ai.ui.ReasoningType
 import me.rerere.ai.ui.ServerToolMetadata
@@ -49,6 +51,8 @@ import me.rerere.ai.ui.UIMessagePart
 import me.rerere.ai.ui.metadataAs
 import me.rerere.ai.ui.toMetadata
 import me.rerere.ai.util.KeyRoulette
+import me.rerere.ai.util.HttpException
+import me.rerere.ai.util.SSEEventSource
 import me.rerere.ai.util.configureReferHeaders
 import me.rerere.ai.util.configureSessionHeaders
 import me.rerere.ai.util.encodeBase64
@@ -69,6 +73,7 @@ import okhttp3.Response
 import okhttp3.sse.EventSource
 import okhttp3.sse.EventSourceListener
 import okhttp3.sse.EventSources
+import java.io.IOException
 import kotlin.time.Clock
 
 private const val TAG = "ResponseAPI"
@@ -82,6 +87,25 @@ class ResponseAPI(
         messages: List<UIMessage>,
         params: TextGenerationParams
     ): TextGenerationResult = withContext(Dispatchers.IO) {
+        if (providerSetting.chatGptAccountId != null) {
+            val handler = StreamChunkHandler(params.model)
+            var resultMessages = listOf(UIMessage(modelId = params.model.id, role = MessageRole.ASSISTANT, parts = emptyList()))
+            var finish: StreamChunk.Finish? = null
+            streamText(providerSetting, messages, params).collect { chunk ->
+                resultMessages = handler.handle(resultMessages, chunk)
+                if (chunk is StreamChunk.Finish) finish = chunk
+            }
+            val terminal = finish ?: throw IOException("ChatGPT 响应流结束时未收到 response.completed")
+            val message = resultMessages.last()
+            return@withContext TextGenerationResult(
+                id = terminal.responseId ?: message.id.toString(),
+                model = terminal.model ?: params.model.modelId,
+                message = message,
+                finishReason = terminal.finishReason,
+                usage = message.usage,
+                latestRequestUsage = message.usage,
+            )
+        }
         val requestBody = buildRequestBody(
             providerSetting = providerSetting,
             messages = messages,
@@ -92,9 +116,9 @@ class ResponseAPI(
             .url("${providerSetting.baseUrl}${providerSetting.responsesPath}")
             .headers(params.customHeaders.toHeaders())
             .post(json.encodeToString(requestBody).toRequestBody("application/json".toMediaType()))
-            .addHeader(
+            .header(
                 "Authorization",
-                "Bearer ${keyRoulette.next(providerSetting.apiKey, providerSetting.id.toString())}"
+                "Bearer ${openAIBearer(providerSetting, keyRoulette)}"
             )
             .addHeader("Content-Type", "application/json")
             .configureReferHeaders(providerSetting.baseUrl)
@@ -121,27 +145,30 @@ class ResponseAPI(
         messages: List<UIMessage>,
         params: TextGenerationParams
     ): Flow<StreamChunk> = callbackFlow {
+        val setting = normalizeChatGptProvider(providerSetting)
         val requestBody = buildRequestBody(
-            providerSetting = providerSetting,
+            providerSetting = setting,
             messages = messages,
             params = params,
             stream = true,
         )
         val request = Request.Builder()
-            .url("${providerSetting.baseUrl}${providerSetting.responsesPath}")
+            .url("${setting.baseUrl}${setting.responsesPath}")
             .headers(params.customHeaders.toHeaders())
             .post(json.encodeToString(requestBody).toRequestBody("application/json".toMediaType()))
-            .addHeader(
+            .header(
                 "Authorization",
-                "Bearer ${keyRoulette.next(providerSetting.apiKey, providerSetting.id.toString())}"
+                "Bearer ${openAIBearer(setting, keyRoulette)}"
             )
-            .configureReferHeaders(providerSetting.baseUrl)
-            .configureSessionHeaders(providerSetting.baseUrl, params.sessionId)
+            .configureReferHeaders(setting.baseUrl)
+            .configureSessionHeaders(setting.baseUrl, params.sessionId)
             .build()
 
-        Log.i(TAG, "streamText: ${json.encodeToString(requestBody)}")
+        if (setting.chatGptAccountId == null) {
+            Log.i(TAG, "streamText: ${json.encodeToString(requestBody)}")
+        }
 
-        val decoder = ResponseApiStreamDecoder()
+        val decoder = ResponseApiStreamDecoder(requireCompletedEvent = setting.chatGptAccountId != null)
 
         fun sendChunks(chunks: Iterable<StreamChunk>) {
             chunks.forEach { chunk ->
@@ -158,7 +185,7 @@ class ResponseAPI(
                 type: String?,
                 data: String
             ) {
-                Log.d(TAG, "onEvent: $id/$type $data")
+                if (setting.chatGptAccountId == null) Log.d(TAG, "onEvent: $id/$type $data")
                 try {
                     val result = decoder.accept(SseEvent(id = id, event = type, data = data))
                     sendChunks(result.chunks)
@@ -169,6 +196,23 @@ class ResponseAPI(
             }
 
             override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
+                if (setting.chatGptAccountId != null) {
+                    // A body can contain the complete prompt or response. Never log or interpret a
+                    // successful SSE response as an error JSON document just because transport failed.
+                    var exception = t ?: IOException("ChatGPT 请求失败（HTTP ${response?.code ?: "未知"}）")
+                    if (response != null && !response.isSuccessful) {
+                        val errorCode = runCatching {
+                            val payload = json.parseToJsonElement(response.peekBody(64L * 1024).string())
+                            payload.jsonObjectOrNull?.get("error")?.jsonObjectOrNull
+                                ?.get("code")?.jsonPrimitiveOrNull?.contentOrNull
+                                ?.takeIf { it.matches(Regex("[a-zA-Z0-9_]{1,100}")) }
+                        }.getOrNull()
+                        if (errorCode != null) exception = HttpException("ChatGPT 请求失败（HTTP ${response.code}，$errorCode）")
+                    }
+                    Log.w(TAG, "ChatGPT Responses 失败：HTTP ${response?.code ?: "未知"}，${exception.javaClass.simpleName}")
+                    close(exception)
+                    return
+                }
                 var exception = t
 
                 t?.printStackTrace()
@@ -191,20 +235,27 @@ class ResponseAPI(
             }
 
             override fun onClosed(eventSource: EventSource) {
-                sendChunks(decoder.onClosed())
-                close()
+                try {
+                    sendChunks(decoder.onClosed())
+                    close()
+                } catch (e: Exception) {
+                    close(e)
+                }
             }
         }
 
-        val eventSource = EventSources.createFactory(client)
+        val factory = if (setting.chatGptAccountId != null) {
+            SSEEventSource.factory(client, allowHeaderlessResponses = true)
+        } else EventSources.createFactory(client)
+        val eventSource = factory
             .newEventSource(request, listener)
 
         awaitClose {
-            println("[awaitClose] 关闭eventSource ")
+            if (setting.chatGptAccountId == null) println("[awaitClose] 关闭eventSource ")
             eventSource.cancel()
         }
         // trySend 在缓冲满时会静默丢弃 delta，导致回复中间缺字 (#1295)，因此缓冲必须无界
-    }.buffer(Channel.UNLIMITED).flowOn(Dispatchers.IO)
+    }.buffer(Channel.UNLIMITED).flowOn(Dispatchers.IO).guardChatGptSession(providerSetting)
 
     internal fun buildRequestBody(
         providerSetting: ProviderSetting.OpenAI,
@@ -297,7 +348,9 @@ class ResponseAPI(
                     }
                 }
             }
-        }.mergeCustomBody(params.customBody)
+        }.mergeCustomBody(params.customBody).let { body ->
+            if (providerSetting.chatGptAccountId == null) body else normalizeChatGptResponseBody(body)
+        }
     }
 
     internal fun buildMessages(messages: List<UIMessage>) = buildJsonArray {

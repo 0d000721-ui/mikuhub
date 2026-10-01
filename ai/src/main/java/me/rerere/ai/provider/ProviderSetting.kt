@@ -1,6 +1,7 @@
 package me.rerere.ai.provider
 
 import androidx.compose.runtime.Composable
+import kotlinx.coroutines.Job
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -66,6 +67,9 @@ sealed class ProviderSetting {
         var useResponseApi: Boolean = false,
         var includeHistoryReasoning: Boolean = true,
         var responsesPath: String = "/responses",
+        // Local credential reference only. Access and refresh tokens never belong in saved provider settings.
+        val chatGptAccountId: String? = null,
+        @Transient val chatGptRequestJob: Job? = null,
     ) : ProviderSetting() {
         override fun addModel(model: Model): ProviderSetting {
             return copy(models = models + model)

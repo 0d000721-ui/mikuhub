@@ -1,0 +1,552 @@
+<?xml version="1.0" encoding="utf-8"?>
+<issues
+  format="6"
+  by="lint 9.3.1"
+  type="baseline"
+  client="gradle"
+  dependencies="false"
+  name="AGP (9.3.1)"
+  variant="optimized"
+  version="9.3.1">
+  <!--Only 54 Error findings verified against HEAD 4ad506e61be8a8cfb07776ce7ffe1acffa428d06. Keep new errors and all warnings enabled.-->
+  <issue
+    id="NonObservableLocale"
+    message="Reading locale in a non-observable way in a composable function"
+    errorLine1="            else -&gt; locale.getDisplayLanguage(Locale.getDefault())"
+    errorLine2="                                              ~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/components/message/ChatMessageTranslation.kt"
+      line="90"
+      column="47" />
+  </issue>
+  <issue
+    id="NonObservableLocale"
+    message="Reading locale in a non-observable way in a composable function"
+    errorLine1="                                    labelDate.month.getDisplayName(TextStyle.SHORT, Locale.getDefault())"
+    errorLine2="                                                                                    ~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/stats/StatsPage.kt"
+      line="222"
+      column="85" />
+  </issue>
+  <issue
+    id="NonObservableLocale"
+    message="Reading locale in a non-observable way in a composable function"
+    errorLine1="            else -&gt; locale.getDisplayLanguage(Locale.getDefault())"
+    errorLine2="                                              ~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/translator/TranslatorPage.kt"
+      line="240"
+      column="47" />
+  </issue>
+  <issue
+    id="ContextCastToActivity"
+    message="LocalContext should not be cast to Activity, use LocalActivity instead"
+    errorLine1="    val activity = LocalContext.current as? me.rerere.rikkahub.RouteActivity"
+    errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/chat/ChatList.kt"
+      line="216"
+      column="20" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                        toaster.show(exception.message ?: context.getString(R.string.assistant_importer_import_failed))"
+    errorLine2="                                                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/assistant/detail/AssistantImporter.kt"
+      line="89"
+      column="59" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                        toaster.show(exception.message ?: context.getString(R.string.assistant_importer_import_failed))"
+    errorLine2="                                                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/assistant/detail/AssistantImporter.kt"
+      line="115"
+      column="59" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                            toaster.show(context.getString(R.string.chat_page_delete_folder_generating), type = ToastType.Warning)"
+    errorLine2="                                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/chat/ChatDrawer.kt"
+      line="634"
+      column="42" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                                message = if (failed.isEmpty()) context.getString(R.string.imggen_page_delete_images_success, images.size)"
+    errorLine2="                                                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/imggen/ImgGenPage.kt"
+      line="574"
+      column="65" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                                else context.getString("
+    errorLine2="                                     ^">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/imggen/ImgGenPage.kt"
+      line="575"
+      column="38" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                                                                message = context.getString(R.string.imggen_page_image_saved_success),"
+    errorLine2="                                                                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/imggen/ImgGenPage.kt"
+      line="741"
+      column="75" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                                                                message = context.getString("
+    errorLine2="                                                                          ^">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/imggen/ImgGenPage.kt"
+      line="746"
+      column="75" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                        context.getString(R.string.backup_page_backup_success),"
+    errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/backup/tabs/ImportExportTab.kt"
+      line="85"
+      column="25" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                        context.getString(R.string.backup_page_restore_failed, e.message ?: &quot;&quot;),"
+    errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/backup/tabs/ImportExportTab.kt"
+      line="91"
+      column="25" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                        context.getString(R.string.backup_page_restore_success),"
+    errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/backup/tabs/ImportExportTab.kt"
+      line="165"
+      column="25" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                        context.getString(R.string.backup_page_restore_failed, e.message ?: &quot;&quot;),"
+    errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/backup/tabs/ImportExportTab.kt"
+      line="172"
+      column="25" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                        context.getString(R.string.mermaid_export_success),"
+    errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/components/richtext/Mermaid.kt"
+      line="74"
+      column="25" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                        context.getString(R.string.mermaid_export_failed),"
+    errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/components/richtext/Mermaid.kt"
+      line="80"
+      column="25" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                                            context.getString("
+    errorLine2="                                            ^">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/assistant/detail/PropertyEditor.kt"
+      line="171"
+      column="45" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                                        context.getString("
+    errorLine2="                                        ^">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/setting/components/ProviderConnectionTester.kt"
+      line="199"
+      column="41" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                                        context.getString("
+    errorLine2="                                        ^">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/setting/components/ProviderConnectionTester.kt"
+      line="208"
+      column="41" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                                context.getString(R.string.backup_page_connection_success),"
+    errorLine2="                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/backup/tabs/S3Tab.kt"
+      line="257"
+      column="33" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                                context.getString("
+    errorLine2="                                ^">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/backup/tabs/S3Tab.kt"
+      line="263"
+      column="33" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                                context.getString(R.string.backup_page_backup_success),"
+    errorLine2="                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/backup/tabs/S3Tab.kt"
+      line="292"
+      column="33" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                                it.message ?: context.getString(R.string.backup_page_unknown_error),"
+    errorLine2="                                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/backup/tabs/S3Tab.kt"
+      line="298"
+      column="47" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                                                context.getString(R.string.backup_page_delete_success),"
+    errorLine2="                                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/backup/tabs/S3Tab.kt"
+      line="360"
+      column="49" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                                                context.getString("
+    errorLine2="                                                ^">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/backup/tabs/S3Tab.kt"
+      line="367"
+      column="49" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                                                context.getString(R.string.backup_page_restore_success),"
+    errorLine2="                                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/backup/tabs/S3Tab.kt"
+      line="382"
+      column="49" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                                                context.getString("
+    errorLine2="                                                ^">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/backup/tabs/S3Tab.kt"
+      line="390"
+      column="49" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                                context.getString(R.string.setting_provider_page_save_success),"
+    errorLine2="                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/setting/SettingProviderDetailPage.kt"
+      line="228"
+      column="33" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                toaster.show(context.getString(R.string.skills_page_import_success, message))"
+    errorLine2="                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/extensions/skills/SkillsPage.kt"
+      line="90"
+      column="30" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                toaster.show(context.getString(R.string.skills_page_import_failed, message))"
+    errorLine2="                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/extensions/skills/SkillsPage.kt"
+      line="92"
+      column="30" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                        toaster.show(context.getString(R.string.skills_page_save_failed))"
+    errorLine2="                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/extensions/skills/SkillsPage.kt"
+      line="195"
+      column="38" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                        toaster.show(context.getString(R.string.skills_page_import_success, message))"
+    errorLine2="                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/extensions/skills/SkillsPage.kt"
+      line="209"
+      column="38" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                        toaster.show(context.getString(R.string.skills_page_import_failed, message))"
+    errorLine2="                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/extensions/skills/SkillsPage.kt"
+      line="211"
+      column="38" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                    toaster.show(context.getString(R.string.text_area_import_success), type = ToastType.Success)"
+    errorLine2="                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/components/ui/TextArea.kt"
+      line="99"
+      column="34" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                    val errorMessage = e.message ?: context.getString(R.string.text_area_import_failed)"
+    errorLine2="                                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/components/ui/TextArea.kt"
+      line="102"
+      column="53" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                                context.getString(R.string.backup_page_connection_success),"
+    errorLine2="                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/backup/tabs/WebDavTab.kt"
+      line="239"
+      column="33" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                                context.getString("
+    errorLine2="                                ^">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/backup/tabs/WebDavTab.kt"
+      line="245"
+      column="33" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                                context.getString(R.string.backup_page_backup_success),"
+    errorLine2="                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/backup/tabs/WebDavTab.kt"
+      line="273"
+      column="33" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                                it.message ?: context.getString(R.string.backup_page_unknown_error),"
+    errorLine2="                                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/backup/tabs/WebDavTab.kt"
+      line="279"
+      column="47" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                                                context.getString(R.string.backup_page_delete_success),"
+    errorLine2="                                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/backup/tabs/WebDavTab.kt"
+      line="341"
+      column="49" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                                                context.getString("
+    errorLine2="                                                ^">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/backup/tabs/WebDavTab.kt"
+      line="348"
+      column="49" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                                                context.getString(R.string.backup_page_restore_success),"
+    errorLine2="                                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/backup/tabs/WebDavTab.kt"
+      line="363"
+      column="49" />
+  </issue>
+  <issue
+    id="LocalContextGetResourceValueCall"
+    message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+    errorLine1="                                                context.getString("
+    errorLine2="                                                ^">
+    <location
+      file="src/main/java/me/rerere/rikkahub/ui/pages/backup/tabs/WebDavTab.kt"
+      line="371"
+      column="49" />
+  </issue>
+  <issue
+    id="MissingTranslation"
+    message="&quot;safe_mode_enter_app&quot; is not translated in &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;zh&quot; (Chinese)"
+    errorLine1="  &lt;string name=&quot;safe_mode_enter_app&quot;&gt;Enter App&lt;/string&gt;"
+    errorLine2="          ~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/res/values/strings.xml"
+      line="560"
+      column="11" />
+  </issue>
+  <issue
+    id="MissingTranslation"
+    message="&quot;setting_tts_page_temperature&quot; is not translated in &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese)"
+    errorLine1="  &lt;string name=&quot;setting_tts_page_temperature&quot;&gt;Temperature&lt;/string&gt;"
+    errorLine2="          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/res/values/strings.xml"
+      line="1051"
+      column="11" />
+  </issue>
+  <issue
+    id="MissingTranslation"
+    message="&quot;setting_tts_page_temperature_description&quot; is not translated in &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese)"
+    errorLine1="  &lt;string name=&quot;setting_tts_page_temperature_description&quot;&gt;Control the randomness of the voice (0.0 - 1.0, higher is more expressive)&lt;/string&gt;"
+    errorLine2="          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/res/values/strings.xml"
+      line="1052"
+      column="11" />
+  </issue>
+  <issue
+    id="MissingTranslation"
+    message="&quot;setting_tts_page_fish_audio_speed_description&quot; is not translated in &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese)"
+    errorLine1="  &lt;string name=&quot;setting_tts_page_fish_audio_speed_description&quot;&gt;Speech speed (0.5 - 2.0, 1.0 is normal)&lt;/string&gt;"
+    errorLine2="          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/res/values/strings.xml"
+      line="1053"
+      column="11" />
+  </issue>
+  <issue
+    id="MissingTranslation"
+    message="&quot;theme_name_claude&quot; is not translated in &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;zh&quot; (Chinese)"
+    errorLine1="  &lt;string name=&quot;theme_name_claude&quot;&gt;Claude&lt;/string&gt;"
+    errorLine2="          ~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/res/values/strings.xml"
+      line="1134"
+      column="11" />
+  </issue>
+  <issue
+    id="MissingTranslation"
+    message="&quot;workspace_terminal_tab&quot; is not translated in &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;zh&quot; (Chinese)"
+    errorLine1="  &lt;string name=&quot;workspace_terminal_tab&quot;&gt;Terminal %1$d&lt;/string&gt;"
+    errorLine2="          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/res/values/strings.xml"
+      line="1233"
+      column="11" />
+  </issue>
+  <issue
+    id="MissingTranslation"
+    message="&quot;workspace_terminal_new_tab&quot; is not translated in &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;zh&quot; (Chinese)"
+    errorLine1="  &lt;string name=&quot;workspace_terminal_new_tab&quot;&gt;New terminal tab&lt;/string&gt;"
+    errorLine2="          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/res/values/strings.xml"
+      line="1234"
+      column="11" />
+  </issue>
+  <issue
+    id="MissingTranslation"
+    message="&quot;workspace_terminal_close_tab&quot; is not translated in &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;zh&quot; (Chinese)"
+    errorLine1="  &lt;string name=&quot;workspace_terminal_close_tab&quot;&gt;Close terminal %1$d&lt;/string&gt;"
+    errorLine2="          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/res/values/strings.xml"
+      line="1235"
+      column="11" />
+  </issue>
+  <issue
+    id="MissingTranslation"
+    message="&quot;workspace_terminal_no_tabs&quot; is not translated in &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;zh&quot; (Chinese)"
+    errorLine1="  &lt;string name=&quot;workspace_terminal_no_tabs&quot;&gt;No open terminal tabs&lt;/string&gt;"
+    errorLine2="          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/res/values/strings.xml"
+      line="1239"
+      column="11" />
+  </issue>
+  <issue
+    id="MissingTranslation"
+    message="&quot;assistant_page_context_message_limit_too_small&quot; is not translated in &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese)"
+    errorLine1="  &lt;string name=&quot;assistant_page_context_message_limit_too_small&quot;&gt;The context message limit cannot be less than %1$d. It has been reset to %1$d.&lt;/string&gt;"
+    errorLine2="          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+    <location
+      file="src/main/res/values/strings.xml"
+      line="1314"
+      column="11" />
+  </issue>
+</issues>

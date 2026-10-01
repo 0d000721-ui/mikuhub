@@ -8,6 +8,19 @@ import org.junit.Test
 
 class DefaultProvidersTest {
     @Test
+    fun `upgrades expose a stable Codex account entry without credentials or fabricated models`() {
+        val provider = DEFAULT_PROVIDERS.filterIsInstance<ProviderSetting.OpenAI>()
+            .single { it.name == "Codex / ChatGPT" }
+        assertEquals("a78b8470-956b-4dc6-8fe9-84f8ea8ed3d1", provider.id.toString())
+        assertTrue(provider.builtIn)
+        assertEquals("https://api.openai.com/v1", provider.baseUrl)
+        assertEquals("/responses", provider.responsesPath)
+        assertTrue(provider.useResponseApi)
+        assertTrue(provider.apiKey.isEmpty())
+        assertTrue(provider.models.isEmpty())
+    }
+
+    @Test
     fun `default providers should include vercel ai gateway with expected balance config`() {
         val vercelProviders = DEFAULT_PROVIDERS
             .filterIsInstance<ProviderSetting.OpenAI>()
