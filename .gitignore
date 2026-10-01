@@ -22,3 +22,10 @@ app/app.key
 **/google-services.json
 .env
 .env.*
+
+# Local account state must never be included in published source or packages.
+**/auth.json
+**/chatgpt-accounts-v1.enc*
+**/Cookies
+**/Cookies-journal
+**/Login Data*

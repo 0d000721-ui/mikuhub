@@ -62,6 +62,9 @@ import me.rerere.rikkahub.data.db.DatabaseMigrationTracker
 import me.rerere.rikkahub.data.db.MigrationState
 import me.rerere.rikkahub.data.event.AppEvent
 import me.rerere.rikkahub.data.event.AppEventBus
+import me.rerere.rikkahub.browser.BrowserImageChatBridge
+import me.rerere.rikkahub.browser.BrowserImageChatResult
+import me.rerere.rikkahub.ui.context.LocalBrowserChatSource
 import me.rerere.rikkahub.ui.activity.SafeModeActivity
 import me.rerere.rikkahub.ui.components.ui.TTSController
 import me.rerere.rikkahub.ui.context.LocalASRState
@@ -147,6 +150,7 @@ import kotlin.uuid.Uuid
 
 private const val TAG = "RouteActivity"
 private const val ACTION_TRANSLATE = "me.rerere.rikkahub.action.TRANSLATE"
+private const val ACTION_IMAGE_GEN = "me.rerere.rikkahub.action.IMAGE_GEN"
 
 class RouteActivity : ComponentActivity() {
     private val okHttpClient by inject<OkHttpClient>()
@@ -228,6 +232,7 @@ class RouteActivity : ComponentActivity() {
         }
         val destination = when (intent.action) {
             ACTION_TRANSLATE -> Screen.Translator
+            ACTION_IMAGE_GEN -> Screen.ImageGen
             Intent.ACTION_SEND -> Screen.ShareHandler(
                 text = intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty(),
                 streamUri = intent.getStringExtra(Intent.EXTRA_STREAM),
@@ -274,6 +279,29 @@ class RouteActivity : ComponentActivity() {
         )
 
         val backStack = rememberNavBackStack(startScreen)
+        val browserImageChat = koinInject<BrowserImageChatBridge>()
+        LaunchedEffect(backStack.lastOrNull()) {
+            (backStack.lastOrNull() as? Screen.Chat)?.let {
+                browserImageChat.observeNativeConversation(Uuid.parse(it.id))
+            }
+        }
+        LaunchedEffect(browserImageChat) {
+            browserImageChat.events.collect { event ->
+                if (!browserImageChat.isCurrent(event.target)) return@collect
+                if (event.receipt.result == BrowserImageChatResult.DELIVERED && backStack.lastOrNull() == Screen.AgentBrowser) {
+                    val id = event.target.conversationId.toString()
+                    val index = backStack.indexOfLast { it is Screen.Chat && it.id == id }
+                    if (index >= 0) {
+                        // Keep the existing ChatVM and its unsent draft when returning from the browser.
+                        while (backStack.lastIndex > index) backStack.removeLastOrNull()
+                    } else {
+                        backStack.clear()
+                        backStack.add(Screen.Chat(id = id, nodeId = event.nodeId?.toString()))
+                    }
+                }
+                toastState.show(event.receipt.message)
+            }
+        }
         SideEffect {
             navStack = backStack
             while (pendingIntents.isNotEmpty()) {
@@ -333,12 +361,14 @@ class RouteActivity : ComponentActivity() {
                                 metadata = NavDisplay.transitionSpec { fadeIn() togetherWith fadeOut() }
                                     + NavDisplay.popTransitionSpec { fadeIn() togetherWith fadeOut() }
                             ) { key ->
-                                ChatPage(
-                                    id = Uuid.parse(key.id),
-                                    text = key.text,
-                                    files = key.files.map { it.toUri() },
-                                    nodeId = key.nodeId?.let { Uuid.parse(it) }
-                                )
+                                CompositionLocalProvider(LocalBrowserChatSource provides Uuid.parse(key.id)) {
+                                    ChatPage(
+                                        id = Uuid.parse(key.id),
+                                        text = key.text,
+                                        files = key.files.map { it.toUri() },
+                                        nodeId = key.nodeId?.let { Uuid.parse(it) }
+                                    )
+                                }
                             }
 
                             entry<Screen.ShareHandler> { key ->

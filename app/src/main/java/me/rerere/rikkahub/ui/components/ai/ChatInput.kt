@@ -77,6 +77,11 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.blur.HazeBlurStyle
 import dev.chrisbanes.haze.blur.hazeBlur
 import dev.chrisbanes.haze.blur.material3.Material3
+import dev.chrisbanes.haze.glass.GlassDefaults
+import dev.chrisbanes.haze.glass.GlassStyle
+import dev.chrisbanes.haze.glass.OpticalSizeValue
+import dev.chrisbanes.haze.glass.hazeGlass
+import dev.chrisbanes.haze.glass.material3.Material3
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.collectLatest
 import me.rerere.ai.provider.Model
@@ -92,9 +97,11 @@ import me.rerere.hugeicons.stroke.Fullscreen
 import me.rerere.hugeicons.stroke.Internet
 import me.rerere.hugeicons.stroke.Zap
 import me.rerere.rikkahub.R
+import me.rerere.rikkahub.data.datastore.BackgroundEffectType
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.getCurrentAssistant
 import me.rerere.rikkahub.data.datastore.getCurrentChatModel
+import me.rerere.rikkahub.data.datastore.findProvider
 import me.rerere.rikkahub.data.datastore.getQuickMessagesOfAssistant
 import me.rerere.rikkahub.data.files.FilesManager
 import me.rerere.rikkahub.data.model.Assistant
@@ -134,6 +141,7 @@ fun ChatInput(
     modifier: Modifier = Modifier,
     completionProviders: List<ChatCompletionProvider> = emptyList(),
     onUpdateChatModel: (Model) -> Unit,
+    onUpdateChatModelSpeed: (Uuid, OpenAiSpeed) -> Unit,
     onUpdateAssistant: (Assistant) -> Unit,
     onUpdateSearchService: (Int) -> Unit,
     onMoreClick: () -> Unit,
@@ -162,7 +170,13 @@ fun ChatInput(
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
 
-    val containerShape = MaterialTheme.shapes.largeIncreased
+    val themeShape = MaterialTheme.shapes.largeIncreased
+    val containerShape = RoundedCornerShape(
+        topStart = themeShape.topStart,
+        topEnd = themeShape.topEnd,
+        bottomEnd = themeShape.bottomEnd,
+        bottomStart = themeShape.bottomStart,
+    )
     val modelListState = rememberModelListState(
         modelId = assistant.chatModelId ?: settings.chatModelId,
         providers = settings.providers,
@@ -235,11 +249,28 @@ fun ChatInput(
                     .fillMaxWidth()
                     .clip(containerShape)
                     .then(
-                        if (settings.displaySetting.enableBlurEffect) Modifier.hazeBlur(
-                            input = HazeInput.Sources(hazeState),
-                            style = inputHazeStyle,
-                        )
-                        else Modifier
+                        if (settings.displaySetting.enableBlurEffect) {
+                            when (settings.displaySetting.backgroundEffectType) {
+                                BackgroundEffectType.BLUR -> Modifier.hazeBlur(
+                                    input = HazeInput.Sources(hazeState),
+                                    style = inputHazeStyle,
+                                )
+                                BackgroundEffectType.GLASS -> Modifier.hazeGlass(
+                                    input = HazeInput.Sources(hazeState),
+                                    style = GlassStyle.Material3(
+                                        containerColor = hazeTintColor,
+                                        tint = hazeTintColor.copy(alpha = 0.3f),
+                                    ) {
+                                        // Keep background text from competing with the input text.
+                                        optics(GlassDefaults.optics.copy(
+                                            blurRadius = OpticalSizeValue.Fixed(16.dp),
+                                            depth = OpticalSizeValue.Fixed(0.5f),
+                                        ))
+                                        shape(containerShape)
+                                    },
+                                )
+                            }
+                        } else Modifier
                     ),
                 shape = containerShape,
                 tonalElevation = 0.dp,
@@ -300,6 +331,7 @@ fun ChatInput(
                                     )
                                 }
                             }
+                            ExecutionApprovalControl()
 
                             // Search
                             val enableSearchMsg = stringResource(R.string.web_search_enabled)
@@ -327,6 +359,14 @@ fun ChatInput(
 
                             // Reasoning
                             val model = settings.getCurrentChatModel()
+                            if (model != null) {
+                                OpenAiSpeedButton(
+                                    model = model,
+                                    provider = model.findProvider(settings.providers),
+                                    assistantBodies = assistant.customBodies,
+                                    onSelect = { onUpdateChatModelSpeed(model.id, it) },
+                                )
+                            }
                             if (model?.abilities?.contains(ModelAbility.REASONING) == true) {
                                 ReasoningButton(
                                     reasoningLevel = assistant.reasoningLevel,

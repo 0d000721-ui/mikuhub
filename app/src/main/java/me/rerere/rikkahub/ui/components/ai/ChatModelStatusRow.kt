@@ -17,7 +17,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -28,7 +27,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -41,8 +39,6 @@ import me.rerere.hugeicons.stroke.ArrowDown01
 import me.rerere.hugeicons.stroke.Brain02
 import me.rerere.hugeicons.stroke.Download01
 import me.rerere.rikkahub.data.model.Conversation
-import me.rerere.ai.provider.ProviderSetting
-import me.rerere.rikkahub.data.ai.chatgpt.ChatGptAccountManager
 import me.rerere.rikkahub.device.DownloadInstallManager
 import me.rerere.rikkahub.device.DownloadStatus
 import me.rerere.rikkahub.device.formatDownloadBytes
@@ -78,24 +74,6 @@ internal fun ChatModelStatusRow(
                 onClick = onOpenContext,
             )
             DownloadStatusIndicator(Modifier.width(downloadWidth), onOpenDownloads)
-            val provider = modelState.providers.firstOrNull { candidate ->
-                candidate.models.any { it.id == modelState.modelId }
-            } as? ProviderSetting.OpenAI
-            provider?.chatGptAccountId?.takeIf { it.isNotBlank() }?.let { accountId ->
-                ChatGptPlanIndicator(accountId)
-            }
-        }
-    }
-}
-
-@Composable
-private fun ChatGptPlanIndicator(accountId: String, manager: ChatGptAccountManager = koinInject()) {
-    val accounts by manager.accounts.collectAsStateWithLifecycle()
-    val account = accounts.find { it.id == accountId } ?: return
-    val uriHandler = LocalUriHandler.current
-    if (account.connected && account.planEnabled) {
-        TextButton(onClick = { uriHandler.openUri("https://chatgpt.com/settings/usage") }) {
-            Text("Using ChatGPT plan · Manage usage", style = MaterialTheme.typography.labelSmall)
         }
     }
 }

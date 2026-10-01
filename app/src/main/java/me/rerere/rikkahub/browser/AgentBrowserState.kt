@@ -12,5 +12,7 @@ data class AgentBrowserState(
     val lastAction: String? = null,
     val message: String? = null,
     val error: String? = null,
+    val renderNotice: String? = null,
+    val renderDiagnostics: String? = null,
     val session: Long = 0,
 )

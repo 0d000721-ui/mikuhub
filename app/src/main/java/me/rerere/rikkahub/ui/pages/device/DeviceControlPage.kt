@@ -146,7 +146,7 @@ fun DeviceControlPage(
                     explanation = "向 Magisk / Root 管理器请求授权并验证当前身份",
                     requestedTransport = "root",
                     impact = "仅输出 UID 和用户组；成功后将本次会话设备通道设为 Root",
-                    riskExplanation = "本次测试不修改文件或系统设置；后续 Root 操作仍按命令单独确认",
+                    riskExplanation = "本次测试不修改文件或系统设置；后续操作按你选择的自动授权模式执行",
                 )
                 rootSuccess = result["success"]?.jsonPrimitive?.booleanOrNull == true
                 rootResult = result["error"]?.jsonPrimitive?.content ?: result["output"]?.jsonPrimitive?.content
@@ -231,7 +231,7 @@ fun DeviceControlPage(
                     },
                     style = MaterialTheme.typography.titleSmall,
                 )
-                Text("在 Magisk 超级用户弹窗中允许本应用。验证只读取身份，后续每次 Root 操作仍需单独确认。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("在 Magisk 超级用户弹窗中允许本应用。验证只读取身份，后续操作按自动授权模式决定是否询问。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (rootStatus.state in setOf(RootState.DENIED, RootState.ERROR, RootState.UNAVAILABLE)) {
                     Text(rootStatus.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                 }
@@ -284,19 +284,19 @@ fun DeviceControlPage(
 
         DeviceControlCard {
             Text("本次会话", style = MaterialTheme.typography.titleMedium)
+            me.rerere.rikkahub.ui.components.ai.ExecutionApprovalControl(compact = false)
             Text(
                 when {
                     sessionState.stopped -> "设备操作已停止，正在执行的任务也会取消。"
                     sessionState.authorization == DeviceAuthorization.REVOKED -> "授权已撤销，设备命令不可执行。"
-                    sessionState.authorization == DeviceAuthorization.SESSION -> "已授权常规设备操作；高风险操作和 Root 命令仍会单独询问。"
-                    else -> "按操作请求确认。也可授权本次会话的常规设备操作。"
+                    else -> "设备会话可用，执行确认由上方自动授权模式控制。"
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (!sessionAvailable || sessionState.authorization != DeviceAuthorization.SESSION) {
-                    OutlinedButton(onClick = { session.authorizeSession() }, enabled = !busy) { Text(if (!sessionAvailable) "恢复会话" else "授权本次会话") }
+                if (!sessionAvailable) {
+                    OutlinedButton(onClick = { session.authorizeSession() }, enabled = !busy) { Text("恢复会话") }
                 }
                 if (sessionState.authorization != DeviceAuthorization.REVOKED) {
                     OutlinedButton(onClick = { session.revoke() }) { Text("撤销授权") }

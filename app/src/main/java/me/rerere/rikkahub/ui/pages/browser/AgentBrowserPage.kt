@@ -1,6 +1,5 @@
 package me.rerere.rikkahub.ui.pages.browser
 
-import android.view.ViewGroup
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,6 +32,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -52,6 +52,7 @@ import me.rerere.hugeicons.stroke.Download01
 import me.rerere.hugeicons.stroke.Earth
 import me.rerere.hugeicons.stroke.Refresh01
 import me.rerere.rikkahub.browser.AgentBrowserController
+import me.rerere.rikkahub.browser.isChatGptImagePage
 import me.rerere.rikkahub.ui.components.nav.BackButton
 import me.rerere.rikkahub.ui.context.LocalNavController
 import me.rerere.rikkahub.Screen
@@ -64,8 +65,9 @@ fun AgentBrowserPage(controller: AgentBrowserController = koinInject()) {
     val nav = LocalNavController.current
     val keyboard = LocalSoftwareKeyboardController.current
     var address by rememberSaveable { mutableStateOf(state.url) }
+    val displayOwner = remember(controller, state.session) { controller.newDisplayOwner() }
     LaunchedEffect(state.url) { address = state.url }
-    DisposableEffect(controller) { onDispose { controller.detachDisplay() } }
+    DisposableEffect(controller, displayOwner) { onDispose { controller.detachDisplay(displayOwner) } }
     BackHandler(state.canGoBack) { controller.manualGoBack() }
 
     fun navigate() {
@@ -109,6 +111,17 @@ fun AgentBrowserPage(controller: AgentBrowserController = koinInject()) {
                 keyboardActions = KeyboardActions(onGo = { navigate() }),
                 textStyle = MaterialTheme.typography.bodyMedium,
             )
+            TextButton(onClick = { keyboard?.hide(); controller.openChatGptImages() }, modifier = Modifier.padding(horizontal = 10.dp)) {
+                Text("ChatGPT 网页生图")
+            }
+            if (isChatGptImagePage(state.url)) {
+                Text(
+                    "在网页内登录，进入 Images／创建图片。Image 2／2.5 以官方可用项为准；生成后点网页保存。网页登录独立于应用的 ChatGPT 授权。",
+                    Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -162,8 +175,20 @@ fun AgentBrowserPage(controller: AgentBrowserController = koinInject()) {
                     }
                 }
             }
-            if (state.url.isBlank()) {
-                Box(Modifier.weight(1f).fillMaxWidth().padding(28.dp), contentAlignment = Alignment.Center) {
+            state.renderNotice?.let { notice ->
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    Text(notice, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                key(state.session) {
+                    AndroidView(
+                        factory = { context -> controller.webViewForDisplay(context, displayOwner) },
+                        modifier = Modifier.fillMaxSize(),
+                        onRelease = { controller.detachDisplay(displayOwner) },
+                    )
+                }
+                if (state.url.isBlank()) Box(Modifier.fillMaxSize().padding(28.dp), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         Icon(HugeIcons.Earth, null, Modifier.size(52.dp), tint = MaterialTheme.colorScheme.primary)
                         Text("网页与下载，留在应用内", style = MaterialTheme.typography.titleMedium)
@@ -173,14 +198,6 @@ fun AgentBrowserPage(controller: AgentBrowserController = koinInject()) {
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                }
-            } else {
-                key(state.session) {
-                    AndroidView(
-                        factory = { controller.webViewForDisplay() },
-                        modifier = Modifier.fillMaxWidth().weight(1f),
-                        onRelease = { view -> (view.parent as? ViewGroup)?.removeView(view) },
-                    )
                 }
             }
         }

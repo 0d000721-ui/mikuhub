@@ -21,10 +21,23 @@ class ChatGptCatalogTest {
         assertEquals(configured.copy(displayName = "New name"), mergeChatGptCatalog(listOf(configured), listOf(discovered)).single())
     }
 
-    @Test fun newModelsKeepServerOrderingAndRemovedModelsAreOmitted() {
-        val removed = Model(modelId = "removed")
+    @Test fun newModelsKeepServerOrderingAndUserConfiguredModelsAreRetained() {
+        val manual = Model(modelId = "gpt-6.1-sol", displayName = "My Sol")
         val first = Model(modelId = "first")
         val second = Model(modelId = "second")
-        assertEquals(listOf(first, second), mergeChatGptCatalog(listOf(removed), listOf(first, second)))
+        assertEquals(listOf(first, second, manual), mergeChatGptCatalog(listOf(manual), listOf(first, second)))
+    }
+
+    @Test fun anEmptyCatalogDoesNotEraseConfiguredModels() {
+        val manual = Model(modelId = "gpt-6.1-sol")
+        assertEquals(listOf(manual), mergeChatGptCatalog(listOf(manual), emptyList()))
+    }
+
+    @Test fun aPreviouslyManualModelIsNotDuplicatedWhenTheCatalogCatchesUp() {
+        val manual = Model(modelId = "gpt-6.1-sol", customBodies = listOf(CustomBody("service_tier", JsonPrimitive("default"))))
+        val discovered = Model(modelId = manual.modelId, displayName = "GPT-6.1 Sol")
+        val first = mergeChatGptCatalog(listOf(manual), listOf(discovered))
+        assertEquals(listOf(manual.copy(displayName = discovered.displayName)), first)
+        assertEquals(first, mergeChatGptCatalog(first, listOf(discovered)))
     }
 }

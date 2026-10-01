@@ -2,6 +2,7 @@ package me.rerere.ai.provider.providers.openai
 
 import me.rerere.ai.provider.ProviderSetting
 import me.rerere.ai.util.KeyRoulette
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -41,11 +42,19 @@ internal fun requireApiKeyAuthentication(setting: ProviderSetting.OpenAI, operat
     }
 }
 
-/** Account inference has mandatory streaming/storage flags and model-dependent reasoning parameters. */
+internal const val CHATGPT_IMAGE_GENERATION_UNSUPPORTED =
+    "ChatGPT 账号的 Responses 接入暂不支持图像生成，请使用 ChatGPT 网页或支持生图的 API Key 服务商。"
+
+/** Apply account-preview restrictions after merging user-defined request parameters. */
 internal fun normalizeChatGptResponseBody(body: JsonObject): JsonObject {
+    require((body["tools"] as? JsonArray).orEmpty().none { tool ->
+        (tool.jsonObjectOrNull?.get("type") as? JsonPrimitive)?.contentOrNull == "image_generation"
+    }) { CHATGPT_IMAGE_GENERATION_UNSUPPORTED }
     val values = body.toMutableMap()
     values["store"] = JsonPrimitive(false)
     values["stream"] = JsonPrimitive(true)
+    // These fields are unsupported throughout the SIWC preview, independent of reasoning effort.
+    listOf("max_output_tokens", "temperature", "top_p", "top_logprobs").forEach(values::remove)
     val model = body["model"]?.jsonPrimitive?.contentOrNull.orEmpty().lowercase()
     val requiresReasoning = model == "gpt-6-astra" || model.startsWith("gpt-6-astra-") ||
         model == "gpt-6.1-sol" || model.startsWith("gpt-6.1-sol-")
@@ -53,12 +62,6 @@ internal fun normalizeChatGptResponseBody(body: JsonObject): JsonObject {
     if (requiresReasoning && reasoning?.get("effort")?.jsonPrimitive?.contentOrNull == "none") {
         reasoning = JsonObject(reasoning - "effort")
         values["reasoning"] = reasoning
-    }
-    val effort = reasoning?.get("effort")?.jsonPrimitive?.contentOrNull
-    if (requiresReasoning || (reasoning != null && effort != "none")) {
-        values.remove("temperature")
-        values.remove("top_p")
-        values.remove("top_logprobs")
     }
     return JsonObject(values)
 }

@@ -10,6 +10,9 @@ import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -142,6 +145,47 @@ class FilesManager(
             }
         }
         return newUris
+    }
+
+    /** Copies one already-saved browser image; partial files and failed metadata writes are rolled back. */
+    suspend fun copySavedBrowserImageToChat(uri: Uri): Uri {
+        var target: File? = null
+        try {
+            return withContext(Dispatchers.IO) {
+                require(uri.scheme in setOf("content", "file"))
+                val mime = getFileMimeType(uri)
+                require(mime in setOf("image/png", "image/jpeg", "image/webp")) { "不支持的图片格式" }
+                val file = createTargetFile(FileFolders.UPLOAD, "chatgpt-image", mime).also { target = it }
+                val operation = currentCoroutineContext()
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    file.outputStream().use { output ->
+                        val buffer = ByteArray(16 * 1024)
+                        var size = 0L
+                        while (true) {
+                            operation.ensureActive()
+                            val read = input.read(buffer)
+                            if (read < 0) break
+                            size += read
+                            require(size <= 20L * 1024 * 1024) { "图片过大" }
+                            output.write(buffer, 0, read)
+                        }
+                        require(size > 0) { "图片为空" }
+                    }
+                } ?: error("无法读取已保存的图片")
+                operation.ensureActive()
+                createManagedFileEntity(FileFolders.UPLOAD, file, "ChatGPT 网页图片", requireNotNull(mime))
+                file.toUri()
+            }
+        } catch (error: Throwable) {
+            withContext(NonCancellable + Dispatchers.IO) {
+                target?.let { file ->
+                    file.delete()
+                    // The insert might have committed immediately before cancellation was delivered.
+                    runCatching { repository.deleteByPath(buildRelativePath(FileFolders.UPLOAD, file)) }
+                }
+            }
+            throw error
+        }
     }
 
     fun createChatFilesByByteArrays(byteArrays: List<ByteArray>): List<Uri> {
@@ -513,6 +557,7 @@ data class SyncResult(
 object FileFolders {
     const val UPLOAD = "upload"
     const val SKILLS = "skills"
+    const val BUILTIN_SKILLS = "builtin_skills"
     const val FONTS = "fonts"
     const val TOOL_OUTPUTS = "tool_outputs"
 }

@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import me.rerere.rikkahub.data.ai.ExecutionApprovalMode
+import me.rerere.rikkahub.data.ai.ExecutionApprovalSnapshot
 
 @kotlinx.serialization.Serializable
 enum class DeviceTransport { ADB, SHIZUKU, ROOT }
@@ -34,7 +36,11 @@ interface DeviceCommandRunner {
 
 class DeviceCommandRejectedException(message: String) : IllegalStateException(message)
 
-class DeviceAccessSession(private val record: (DeviceAuditEntry) -> Unit = {}) {
+class DeviceAccessSession(
+    private val approvalMode: () -> ExecutionApprovalMode = { ExecutionApprovalMode.IMPORTANT_ONLY },
+    private val approvalSnapshot: (() -> ExecutionApprovalSnapshot)? = null,
+    private val record: (DeviceAuditEntry) -> Unit = {},
+) {
     private val lock = Any()
     private val mutex = Mutex()
     private val auditEntries = ArrayDeque<DeviceAuditEntry>()
@@ -49,6 +55,12 @@ class DeviceAccessSession(private val record: (DeviceAuditEntry) -> Unit = {}) {
     fun authorizeSession() = changeState { it.copy(authorization = DeviceAuthorization.SESSION, stopped = false) }
     fun revoke() = changeState { it.copy(authorization = DeviceAuthorization.REVOKED) }
     fun stop() = changeState { it.copy(authorization = DeviceAuthorization.REVOKED, stopped = true) }
+
+    /** A changed approval choice invalidates pending/queued device work, without reviving a stopped session. */
+    fun approvalModeChanged() = changeState { it }
+
+    private fun currentApprovalSnapshot() = approvalSnapshot?.invoke() ?: ExecutionApprovalSnapshot(approvalMode(), 0L)
+    val executionApprovalMode get() = currentApprovalSnapshot().mode
 
     /** Called from device settings; selection expires with the process. */
     fun selectTransport(transport: DeviceTransport) {
@@ -84,6 +96,7 @@ class DeviceAccessSession(private val record: (DeviceAuditEntry) -> Unit = {}) {
         requestConfirmation: suspend (DeviceCommandPreview, DeviceTransport) -> Int = { _, _ -> 0 },
     ): String {
         val expectedRevision = synchronized(lock) { revision }
+        val expectedApproval = currentApprovalSnapshot()
         return mutex.withLock {
             coroutineScope {
                 val checked = DeviceCommandPolicy.preview(preview.command, preview.explanation, preview.impact, preview.riskExplanation)
@@ -91,14 +104,15 @@ class DeviceAccessSession(private val record: (DeviceAuditEntry) -> Unit = {}) {
                 var allowed = false
                 try {
                     synchronized(lock) {
-                        checkAccess(expectedRevision)
+                        checkAccess(expectedRevision, expectedApproval)
                         activeJob = job
                     }
                     check(checked.risk != DeviceCommandRisk.BLOCKED) { checked.rejectionReason ?: "Blocked device command" }
                     val confirmations = when {
+                        expectedApproval.mode == ExecutionApprovalMode.UNRESTRICTED -> 0
                         checked.risk == DeviceCommandRisk.KERNEL_CRITICAL -> 3
                         checked.risk == DeviceCommandRisk.DESTRUCTIVE || transport == DeviceTransport.ROOT -> 1
-                        checked.requiresConfirmation && authorization != DeviceAuthorization.SESSION -> 1
+                        checked.requiresConfirmation -> 1
                         else -> 0
                     }
                     if (confirmations > 0) {
@@ -106,7 +120,7 @@ class DeviceAccessSession(private val record: (DeviceAuditEntry) -> Unit = {}) {
                         if (count < confirmations) throw DeviceCommandRejectedException("用户拒绝了操作，或设备确认已超时；请勿自动重试")
                     }
                     currentCoroutineContext().ensureActive()
-                    synchronized(lock) { checkAccess(expectedRevision) }
+                    synchronized(lock) { checkAccess(expectedRevision, expectedApproval) }
                     allowed = true
                     val output = runner.run(checked.command)
                     currentCoroutineContext().ensureActive()
@@ -123,9 +137,10 @@ class DeviceAccessSession(private val record: (DeviceAuditEntry) -> Unit = {}) {
         }
     }
 
-    private fun checkAccess(expectedRevision: Long) {
+    private fun checkAccess(expectedRevision: Long, expectedApproval: ExecutionApprovalSnapshot) {
         check(!stopped) { "设备 Agent 已停止，请在设备控制页开启新的会话" }
         check(authorization != DeviceAuthorization.REVOKED) { "设备会话授权已撤销，请在设备控制页重新开启" }
         check(revision == expectedRevision) { "设备会话已改变，旧请求不能继续执行" }
+        check(currentApprovalSnapshot() == expectedApproval) { "执行授权模式已改变，请重新发起请求" }
     }
 }

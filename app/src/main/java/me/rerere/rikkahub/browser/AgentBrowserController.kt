@@ -2,13 +2,19 @@ package me.rerere.rikkahub.browser
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.ContextWrapper
+import android.content.MutableContextWrapper
+import android.app.Activity
 import android.graphics.Bitmap
 import android.net.http.SslError
 import android.os.Looper
+import android.os.SystemClock
+import android.util.Log
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.CookieManager
+import android.webkit.ConsoleMessage
 import android.webkit.JsPromptResult
 import android.webkit.JsResult
 import android.webkit.RenderProcessGoneDetail
@@ -27,6 +33,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
@@ -47,6 +54,8 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 import me.rerere.rikkahub.device.DownloadInstallManager
 import java.io.ByteArrayInputStream
@@ -60,7 +69,11 @@ private class BrowserOperationStopped : CancellationException("浏览器操作�
  * Leaving its page detaches the view, but retains the document for AI tools in chat.
  * Closing the session destroys the WebView and revokes every outstanding operation.
  */
-class AgentBrowserController(context: Context, private val downloads: DownloadInstallManager) {
+class AgentBrowserController(
+    context: Context,
+    private val downloads: DownloadInstallManager,
+    private val imageChatBridge: BrowserImageChatBridge,
+) {
     private val context = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val operations = Mutex()
@@ -68,6 +81,16 @@ class AgentBrowserController(context: Context, private val downloads: DownloadIn
     private val _state = MutableStateFlow(AgentBrowserState())
     val state = _state.asStateFlow()
     private var webView: WebView? = null
+    private var webViewContext: MutableContextWrapper? = null
+    private val displayOwnership = BrowserDisplayOwnership()
+    private var pendingNavigation: String? = null
+    private var renderJob: Job? = null
+    private var visualVersion = -1L
+    private var renderedVersion = -1L
+    private var resourceFailures = 0
+    private var consoleFailures = 0
+    private var mainFrameFailed = false
+    private var imageCacheKey: String? = null
     private var documentVersion = 0L
     private var snapshotVersion = -1L
     private var elementIds: Set<String> = emptySet()
@@ -75,14 +98,26 @@ class AgentBrowserController(context: Context, private val downloads: DownloadIn
     private var downloadPermit: Long? = null
     private val pendingDownloads = mutableSetOf<Job>()
     private var activeAiJob: Job? = null
+    private val imageDownloadGrant = BrowserImageDownloadGrant()
+    private val imageSaver = BrowserImageSaver(this.context)
+    private var imageDownloadJob: Job? = null
+
+    fun openChatGptImages() {
+        manualNavigate(CHATGPT_IMAGES_URL)
+        _state.value = state.value.copy(message = "请在 ChatGPT 网页内登录，从 Images／创建图片进入生图；Image 2／2.5 的可用项以官方界面为准。生成后点网页的保存按钮。AI 操作仍需你开启下方开关。")
+    }
 
     fun setAiEnabled(enabled: Boolean) {
         mainThread()
         permission.setEnabled(enabled)
         if (!enabled) {
+            imageChatBridge.invalidate()
             activeAiJob?.cancel(BrowserOperationStopped())
             downloadAllowed = false
             pendingDownloads.toList().forEach { it.cancel() }
+            imageDownloadJob?.cancel()
+            imageDownloadGrant.clear()
+            imageCacheKey?.let { key -> webView?.evaluateJavascript(BrowserImageScripts.clear(key), null) }
             webView?.stopLoading()
         }
         _state.value = state.value.copy(
@@ -95,10 +130,10 @@ class AgentBrowserController(context: Context, private val downloads: DownloadIn
 
     fun manualNavigate(url: String) = manualAction {
         val target = browserUrl(url, addHttps = true)
-        val view = ensureWebView()
         invalidateDocument()
-        _state.value = state.value.copy(url = target, loading = true, error = null, message = null)
-        view.loadUrl(target)
+        _state.value = state.value.copy(url = target, loading = true, error = null, message = null, renderNotice = null, renderDiagnostics = null)
+        val view = webView
+        if (view == null) pendingNavigation = target else view.loadUrl(target)
     }
 
     fun manualGoBack() = manualAction { webView?.let { if (it.canGoBack()) it.goBack() } }
@@ -114,24 +149,55 @@ class AgentBrowserController(context: Context, private val downloads: DownloadIn
         _state.value = state.value.copy(message = null, error = null)
     }
 
-    fun webViewForDisplay(): WebView {
+    fun newDisplayOwner(): Long = displayOwnership.newOwner()
+
+    fun webViewForDisplay(displayContext: Context, owner: Long): WebView {
         mainThread()
-        return ensureWebView().also { (it.parent as? ViewGroup)?.removeView(it) }
+        var activityContext = displayContext
+        while (activityContext is ContextWrapper && activityContext !is Activity && activityContext.baseContext !== activityContext) {
+            activityContext = activityContext.baseContext
+        }
+        check(activityContext is Activity) { "浏览器需要当前页面的显示环境" }
+        val view = webView ?: createWebView(displayContext)
+        displayOwnership.claim(owner)
+        webViewContext?.baseContext = displayContext
+        (view.parent as? ViewGroup)?.removeView(view)
+        view.post {
+            if (view === webView && displayOwnership.owns(owner)) {
+                view.onResume()
+                val target = pendingNavigation
+                pendingNavigation = null
+                if (target != null) view.loadUrl(target)
+                else if (isBrowserUrl(view.url)) diagnoseRendering(view, documentVersion)
+            }
+        }
+        return view
     }
 
-    fun detachDisplay() {
+    fun detachDisplay(owner: Long) {
         mainThread()
+        if (!displayOwnership.release(owner)) return
         webView?.let { (it.parent as? ViewGroup)?.removeView(it) }
+        // The session can keep running in chat without retaining the Activity/window.
+        webViewContext?.baseContext = context
+        renderJob?.cancel()
     }
 
     fun releaseBrowser() {
         mainThread()
+        imageChatBridge.invalidate()
         permission.setEnabled(false)
         activeAiJob?.cancel(BrowserOperationStopped())
         pendingDownloads.toList().forEach { it.cancel() }
+        imageDownloadJob?.cancel()
+        imageDownloadGrant.clear()
         downloadAllowed = false
         val old = webView
         webView = null
+        displayOwnership.clear()
+        webViewContext?.baseContext = context
+        webViewContext = null
+        pendingNavigation = null
         invalidateDocument()
         old?.let {
             (it.parent as? ViewGroup)?.removeView(it)
@@ -162,6 +228,7 @@ class AgentBrowserController(context: Context, private val downloads: DownloadIn
         invalidateDocument()
         prepareAiDownload(permit)
         _state.value = state.value.copy(url = target, loading = true, error = null, message = null)
+        pendingNavigation = null
         view.loadUrl(target)
         awaitDocument(permit)
         snapshot(view, permit)
@@ -175,6 +242,7 @@ class AgentBrowserController(context: Context, private val downloads: DownloadIn
     suspend fun click(elementId: String): JsonObject = aiAction("点击网页元素") { view, permit ->
         requireCurrentElement(elementId)
         prepareAiDownload(permit)
+        imageCacheKey?.let { imageScript(view, BrowserImageScripts.arm(it), documentVersion, permit) }
         val result = evaluate(view, BrowserScripts.click(elementId), permit)
         // A click may start a navigation asynchronously. The next read waits for its load.
         delay(250)
@@ -194,6 +262,16 @@ class AgentBrowserController(context: Context, private val downloads: DownloadIn
     }
 
     suspend fun download(url: String, name: String?): JsonObject = aiAction("下载网页文件") { view, permit ->
+        if (isChatGptImagePage(view.url)) {
+            prepareAiDownload(permit)
+            check(imageDownloadGrant.consume(SystemClock.elapsedRealtime(), documentVersion)) { "请先点击网页保存按钮" }
+            val saved = saveChatGptImage(view, url, permit, documentVersion)
+            return@aiAction buildJsonObject {
+                put("saved", true)
+                put("uri", saved.uri.toString())
+                put("message", saved.message)
+            }
+        }
         val target = browserUrl(url)
         permission.verify(permit)
         val id = downloads.enqueueDownload(
@@ -211,8 +289,10 @@ class AgentBrowserController(context: Context, private val downloads: DownloadIn
 
     private fun manualAction(action: () -> Unit) {
         mainThread()
+        pendingNavigation = null
         permission.invalidate()
         activeAiJob?.cancel(BrowserOperationStopped())
+        imageDownloadJob?.cancel()
         downloadPermit = null
         downloadAllowed = true
         invalidateDocument()
@@ -304,6 +384,18 @@ class AgentBrowserController(context: Context, private val downloads: DownloadIn
     }
 
     private fun invalidateDocument() {
+        imageChatBridge.cancelPending()
+        renderJob?.cancel()
+        visualVersion = -1
+        renderedVersion = -1
+        resourceFailures = 0
+        consoleFailures = 0
+        mainFrameFailed = false
+        imageCacheKey?.let { key -> webView?.let { view -> runCatching { view.evaluateJavascript(BrowserImageScripts.uninstall(key), null) } } }
+        imageCacheKey = null
+        if (imageDownloadJob != null) _state.value = state.value.copy(message = "页面或操作已改变，图片保存已停止，未保存")
+        imageDownloadJob?.cancel()
+        imageDownloadGrant.clear()
         documentVersion++
         snapshotVersion = -1
         elementIds = emptySet()
@@ -312,14 +404,218 @@ class AgentBrowserController(context: Context, private val downloads: DownloadIn
     private fun prepareAiDownload(permit: Long) {
         downloadPermit = permit
         downloadAllowed = true
+        imageDownloadGrant.allow(SystemClock.elapsedRealtime(), documentVersion)
+    }
+
+    private fun installImageCapture(view: WebView) {
+        if (view !== webView || !isChatGptImagePage(view.url)) return
+        val key = imageCacheKey ?: ("__miku_blob_" + UUID.randomUUID().toString().replace("-", "")).also { imageCacheKey = it }
+        runCatching { view.evaluateJavascript(BrowserImageScripts.install(key), null) }
+    }
+
+    /** Counts only: never reads page text, form values, URLs, console text, or cookies. */
+    private fun diagnoseRendering(view: WebView, version: Long) {
+        renderJob?.cancel()
+        renderJob = scope.launch {
+            try {
+                repeat(5) { attempt ->
+                    if (view !== webView || version != documentVersion) return@launch
+                    if (view.isAttachedToWindow && view.width > 0 && view.height > 0) {
+                        view.postVisualStateCallback(version, object : WebView.VisualStateCallback() {
+                            override fun onComplete(requestId: Long) {
+                                if (view === webView && version == documentVersion) {
+                                    visualVersion = version
+                                    view.invalidate()
+                                }
+                            }
+                        })
+                    }
+                    val raw = withTimeout(3_000) {
+                        suspendCancellableCoroutine { continuation ->
+                            view.evaluateJavascript(BrowserScripts.renderCounts) { if (continuation.isActive) continuation.resume(it) }
+                        }
+                    }
+                    if (view !== webView || version != documentVersion) return@launch
+                    val counts = Json.parseToJsonElement(decodeBrowserJavascriptResult(raw)).jsonObject
+                    val elements = counts["elements"]?.jsonPrimitive?.intOrNull ?: 0
+                    val visible = counts["visible"]?.jsonPrimitive?.intOrNull ?: 0
+                    val attached = view.isAttachedToWindow && view.isShown
+                    val rendered = !mainFrameFailed && browserPageRendered(attached, visualVersion == version, visible)
+                    _state.value = state.value.copy(
+                        progress = if (rendered) 100 else 95,
+                        renderNotice = if (rendered || !displayOwnership.hasOwner) null else if (attempt < 4) "正在检查网页是否已显示…" else "网页内容未能显示，请重新加载；若仍为空白，请尝试系统浏览器",
+                        renderDiagnostics = "宿主${if (attached) "已挂载" else "未挂载"} · ${view.width}×${view.height} · DOM $elements · 可见 $visible · 绘制${if (visualVersion == version) "就绪" else "等待"} · 资源失败 $resourceFailures · 脚本错误 $consoleFailures",
+                    )
+                    Log.i("MikuHubBrowserRender", state.value.renderDiagnostics.orEmpty())
+                    if (rendered) { renderedVersion = version; return@launch }
+                    delay(1_500)
+                }
+            } catch (_: TimeoutCancellationException) {
+                if (view === webView && version == documentVersion) {
+                    _state.value = state.value.copy(progress = 95, renderNotice = "网页显示检查超时，请重新加载或尝试系统浏览器", renderDiagnostics = "网页计数探测超时 · 资源失败 $resourceFailures · 脚本错误 $consoleFailures")
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (view === webView && version == documentVersion) {
+                    _state.value = state.value.copy(progress = 95, renderNotice = "无法确认网页已显示，请重新加载或尝试系统浏览器", renderDiagnostics = "网页计数探测未完成 · 资源失败 $resourceFailures · 脚本错误 $consoleFailures")
+                }
+            }
+        }
+    }
+
+    private fun verifyImageDownload(view: WebView, version: Long, permit: Long?) {
+        check(view === webView && version == documentVersion && isChatGptImagePage(view.url)) { "页面已跳转，图片保存已取消" }
+        permit?.let(permission::verify)
+    }
+
+    private suspend fun imageScript(view: WebView, script: String, version: Long, permit: Long?): JsonObject {
+        verifyImageDownload(view, version, permit)
+        val raw = withTimeout(10_000) {
+            suspendCancellableCoroutine { continuation ->
+                view.evaluateJavascript(script) { if (continuation.isActive) continuation.resume(it) }
+            }
+        }
+        verifyImageDownload(view, version, permit)
+        return Json.parseToJsonElement(decodeBrowserJavascriptResult(raw)).jsonObject
+    }
+
+    private suspend fun saveChatGptImage(view: WebView, source: String, permit: Long?, version: Long): SavedBrowserImage {
+        require(isChatGptImageSource(view.url, source)) { "只支持当前 ChatGPT 网页的官方图片或 Blob 图片，未保存" }
+        check(imageDownloadJob == null || imageDownloadJob === currentCoroutineContext()[Job]) { "已有图片正在保存，请稍后再点保存" }
+        val job = currentCoroutineContext()[Job]
+        imageDownloadJob = job
+        val key = "__miku_image_" + UUID.randomUUID().toString().replace("-", "")
+        val chatTarget = imageChatBridge.captureTarget()
+        var pending: PendingBrowserImage? = null
+        var savedImage: SavedBrowserImage? = null
+        var stage = BrowserImageStage.START
+        var scriptFailure: String? = null
+        var transport = if (source.startsWith("blob:")) "blob" else "https"
+        fun advance(value: BrowserImageStage) {
+            stage = value
+            Log.i("MikuHubBrowserImage", "stage=${value.name}")
+        }
+        try {
+            advance(BrowserImageStage.START)
+            _state.value = state.value.copy(error = null, message = "正在读取网页图片并保存，请保持当前页面")
+            val chunks = BrowserImageChunks()
+            withTimeout(50_000) {
+                advance(BrowserImageStage.FETCH)
+                val start = imageScript(view, BrowserImageScripts.begin(key, source, imageCacheKey), version, permit)
+                if (start["status"]?.jsonPrimitive?.content != "pending") {
+                    scriptFailure = browserImageScriptFailure(start["code"]?.jsonPrimitive?.content)
+                }
+                check(start["status"]?.jsonPrimitive?.content == "pending") { "网页未允许图片读取，未保存" }
+                while (true) {
+                    currentCoroutineContext().ensureActive()
+                    val result = imageScript(view, BrowserImageScripts.poll(key), version, permit)
+                    when (result["status"]?.jsonPrimitive?.content) {
+                        "pending" -> delay(50)
+                        "chunk" -> {
+                            if (stage != BrowserImageStage.CHUNKS) advance(BrowserImageStage.CHUNKS)
+                            chunks.append(
+                                result.getValue("offset").jsonPrimitive.int,
+                                result.getValue("total").jsonPrimitive.int,
+                                result.getValue("mime").jsonPrimitive.content,
+                                result.getValue("data").jsonPrimitive.content,
+                            )
+                        }
+                        "complete" -> break
+                        else -> {
+                            scriptFailure = browserImageScriptFailure(result["code"]?.jsonPrimitive?.content)
+                            transport = browserImageTransport(result["transport"]?.jsonPrimitive?.content)
+                            error("网页图片下载失败或不是受支持的图片，未保存；请在官方网页重新点保存")
+                        }
+                    }
+                }
+            }
+            advance(BrowserImageStage.SIGNATURE)
+            val bytes = chunks.finish()
+            pending = imageSaver.prepare(bytes, chunks.mime, ::advance)
+            currentCoroutineContext().ensureActive()
+            verifyImageDownload(view, version, permit)
+            // Main-thread publication and feedback are atomic with respect to navigation/revocation.
+            advance(BrowserImageStage.PUBLISH)
+            val saved = pending.commit { verifyImageDownload(view, version, permit) }
+            savedImage = saved
+            advance(BrowserImageStage.COMPLETE)
+            _state.value = state.value.copy(error = null, message = saved.message)
+            verifyImageDownload(view, version, permit)
+            val receipt = imageChatBridge.deliver(chatTarget, saved.uri)
+            return saved.copy(message = listOf(saved.message, receipt.message).filter(String::isNotBlank).joinToString("\n"))
+                .also { if (view === webView && version == documentVersion) _state.value = state.value.copy(error = null, message = it.message) }
+        } catch (cancelled: CancellationException) {
+            Log.i("MikuHubBrowserImage", "stage=${stage.name} code=${browserImageNativeFailure(cancelled)} transport=$transport")
+            if (view === webView && version == documentVersion) {
+                _state.value = if (savedImage != null) {
+                    state.value.copy(message = "${savedImage.message}\n回传聊天已停止", error = null)
+                } else {
+                    state.value.copy(message = null, error = "图片保存已停止或超时，未保存")
+                }
+            }
+            throw cancelled
+        } catch (error: Exception) {
+            Log.i("MikuHubBrowserImage", "stage=${stage.name} code=${scriptFailure ?: browserImageNativeFailure(error)} transport=$transport")
+            savedImage?.let { saved ->
+                val result = saved.copy(message = "${saved.message}\n图片未能回传聊天，已保留相册文件")
+                if (view === webView && version == documentVersion) _state.value = state.value.copy(message = result.message, error = null)
+                return result
+            }
+            if (view === webView && version == documentVersion) {
+                _state.value = state.value.copy(message = null, error = "图片保存失败，未保存；请检查网页登录、图片格式及存储空间后重新点保存")
+            }
+            // Browser/HTTP exception text can contain a signed image URL. Do not expose it to AI or UI.
+            error("图片保存失败，未保存；请在官方网页重试")
+        } finally {
+            pending?.discard()
+            if (view === webView) runCatching { view.evaluateJavascript(BrowserImageScripts.cancel(key), null) }
+            if (imageDownloadJob === job) imageDownloadJob = null
+        }
+    }
+
+    private fun startChatGptImageDownload(view: WebView, source: String) {
+        if (!isChatGptImageSource(view.url, source)) {
+            _state.value = state.value.copy(error = "只支持当前 ChatGPT 网页的官方图片或 Blob 图片，未保存")
+            return
+        }
+        if (imageDownloadJob != null) {
+            _state.value = state.value.copy(error = "已有图片正在保存，请稍后再点保存")
+            return
+        }
+        if (!imageDownloadGrant.consume(SystemClock.elapsedRealtime(), documentVersion)) {
+            _state.value = state.value.copy(error = "请在当前网页点击保存图片；图片下载需要近期手动点击或已授权的 AI 操作")
+            return
+        }
+        val version = documentVersion
+        val permit = downloadPermit
+        val job = scope.launch(start = CoroutineStart.LAZY) {
+            try { saveChatGptImage(view, source, permit, version) }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) {
+                if (view === webView && version == documentVersion) {
+                    _state.value = state.value.copy(message = null, error = "图片保存失败，未保存；请在官方网页重试")
+                }
+            }
+        }
+        pendingDownloads += job
+        job.invokeOnCompletion { scope.launch { pendingDownloads -= job } }
+        job.start()
     }
 
     @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
     private fun ensureWebView(): WebView {
         mainThread()
-        webView?.let { return it }
-        return WebView(context).also { view ->
+        return webView ?: error("请先打开内置浏览器页面，再开启 AI 操作")
+    }
+
+    @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
+    private fun createWebView(displayContext: Context): WebView {
+        val wrapper = MutableContextWrapper(displayContext)
+        webViewContext = wrapper
+        return WebView(wrapper).also { view ->
             webView = view
+            view.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
             view.settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
@@ -340,25 +636,19 @@ class AgentBrowserController(context: Context, private val downloads: DownloadIn
                 displayZoomControls = false
             }
             CookieManager.getInstance().setAcceptThirdPartyCookies(view, false)
-            // Give detached documents a real viewport so DOM layout remains usable in chat.
-            val metrics = context.resources.displayMetrics
-            view.measure(
-                View.MeasureSpec.makeMeasureSpec(metrics.widthPixels, View.MeasureSpec.EXACTLY),
-                View.MeasureSpec.makeMeasureSpec(metrics.heightPixels, View.MeasureSpec.EXACTLY),
-            )
-            view.layout(0, 0, metrics.widthPixels, metrics.heightPixels)
             view.setOnTouchListener { _, event ->
                 if (event.actionMasked == MotionEvent.ACTION_DOWN) {
                     permission.invalidate()
                     activeAiJob?.cancel(BrowserOperationStopped())
+                    imageDownloadJob?.cancel()
                     downloadPermit = null
                     downloadAllowed = true
+                    imageDownloadGrant.allow(SystemClock.elapsedRealtime(), documentVersion)
                 }
                 false
             }
             view.webChromeClient = object : WebChromeClient() {
-                // This session uses an application Context, not an Activity window.
-                // Do not let WebView attempt to create its default native JS dialogs.
+                // Detached sessions have no Activity window; keep dialogs inside the webpage.
                 override fun onJsAlert(view: WebView, url: String?, message: String?, result: JsResult): Boolean {
                     result.cancel()
                     unsupportedDialog(view)
@@ -389,7 +679,12 @@ class AgentBrowserController(context: Context, private val downloads: DownloadIn
 
                 override fun onProgressChanged(view: WebView, newProgress: Int) {
                     if (view !== webView) return
-                    _state.value = state.value.copy(progress = newProgress)
+                    _state.value = state.value.copy(progress = if (renderedVersion == documentVersion) newProgress else newProgress.coerceAtMost(95))
+                }
+
+                override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {
+                    if (view === webView && consoleMessage.messageLevel() in setOf(ConsoleMessage.MessageLevel.ERROR, ConsoleMessage.MessageLevel.WARNING)) consoleFailures++
+                    return true // Consume it without logging potentially private console messages.
                 }
 
                 override fun onReceivedTitle(view: WebView, title: String?) {
@@ -399,6 +694,10 @@ class AgentBrowserController(context: Context, private val downloads: DownloadIn
             }
             view.webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                    if (view === webView && request.isForMainFrame && request.url.scheme == "blob" && isChatGptImagePage(view.url)) {
+                        startChatGptImageDownload(view, request.url.toString())
+                        return true
+                    }
                     if (!isBrowserUrl(request.url.toString())) {
                         if (view === webView) _state.value = state.value.copy(error = "已阻止应用跳转或不支持的链接；只在内置浏览器打开 HTTP(S) 网页")
                         return true
@@ -422,20 +721,40 @@ class AgentBrowserController(context: Context, private val downloads: DownloadIn
                         _state.value = state.value.copy(loading = false, error = "不支持的网页地址")
                         return
                     }
-                    _state.value = state.value.copy(url = url.orEmpty(), loading = true, progress = 0, error = null)
+                    _state.value = state.value.copy(url = url.orEmpty(), loading = true, progress = 0, error = null, renderNotice = null, renderDiagnostics = null)
+                }
+
+                override fun onPageCommitVisible(view: WebView, url: String?) {
+                    if (view !== webView) return
+                    installImageCapture(view)
                 }
 
                 override fun onPageFinished(view: WebView, url: String?) {
                     if (view !== webView) return
                     _state.value = state.value.copy(
                         url = view.url?.takeIf(::isBrowserUrl) ?: state.value.url,
-                        loading = false, progress = 100, canGoBack = view.canGoBack(), canGoForward = view.canGoForward(),
+                        loading = false, progress = 95, canGoBack = view.canGoBack(), canGoForward = view.canGoForward(),
                     )
+                    installImageCapture(view)
+                    diagnoseRendering(view, documentVersion)
                 }
 
                 override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
-                    if (view !== webView || !request.isForMainFrame) return
-                    _state.value = state.value.copy(loading = false, error = "网页加载失败：${error.description}")
+                    if (view !== webView) return
+                    resourceFailures++
+                    if (request.isForMainFrame) {
+                        mainFrameFailed = true
+                        _state.value = state.value.copy(loading = false, error = "网页加载失败，请检查网络后重新加载")
+                    }
+                }
+
+                override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, response: WebResourceResponse) {
+                    if (view !== webView) return
+                    resourceFailures++
+                    if (request.isForMainFrame) {
+                        mainFrameFailed = true
+                        _state.value = state.value.copy(loading = false, error = "网页服务器返回错误（HTTP ${response.statusCode}），请稍后重新加载")
+                    }
                 }
 
                 override fun onReceivedSslError(view: WebView, handler: SslErrorHandler, error: SslError) {
@@ -453,6 +772,10 @@ class AgentBrowserController(context: Context, private val downloads: DownloadIn
             }
             view.setDownloadListener { url, userAgent, contentDisposition, mimeType, _ ->
                 if (view !== webView || !downloadAllowed) return@setDownloadListener
+                if (isChatGptImagePage(view.url)) {
+                    startChatGptImageDownload(view, url)
+                    return@setDownloadListener
+                }
                 val permit = downloadPermit
                 val referer = view.url?.takeIf(::isBrowserUrl)
                 val job = scope.launch {

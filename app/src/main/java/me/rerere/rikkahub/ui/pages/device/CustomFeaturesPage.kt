@@ -25,6 +25,7 @@ import me.rerere.hugeicons.stroke.LookTop
 import me.rerere.hugeicons.stroke.Settings03
 import me.rerere.hugeicons.stroke.Sun01
 import me.rerere.rikkahub.Screen
+import me.rerere.rikkahub.browser.BrowserImageChatBridge
 import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.datastore.getCurrentAssistant
 import me.rerere.rikkahub.data.model.Assistant
@@ -40,6 +41,7 @@ import org.koin.compose.koinInject
 fun CustomFeaturesPage(settingsStore: SettingsStore = koinInject(), downloads: DownloadInstallManager = koinInject()) {
     val assistant = LocalSettings.current.getCurrentAssistant()
     val nav = LocalNavController.current
+    val browserImageChat: BrowserImageChatBridge = koinInject()
     val scope = rememberCoroutineScope()
     val downloadTasks by downloads.downloads.collectAsStateWithLifecycle(initialValue = emptyList())
     val activeDownloads = downloadTasks.filter { it.isActive }
@@ -120,7 +122,7 @@ fun CustomFeaturesPage(settingsStore: SettingsStore = koinInject(), downloads: D
             item("tools") {
                 CardGroup {
                     item(
-                        onClick = { nav.navigate(Screen.AgentBrowser) },
+                        onClick = { browserImageChat.invalidate(); nav.navigate(Screen.AgentBrowser) },
                         leadingContent = { FeatureIcon(HugeIcons.Internet) },
                         headlineContent = { Text("浏览器") },
                         supportingContent = { Text("浏览网页、查找下载入口，可允许 AI 操作") },

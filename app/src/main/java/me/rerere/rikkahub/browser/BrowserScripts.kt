@@ -2,6 +2,34 @@ package me.rerere.rikkahub.browser
 
 /** Fixed, bounded DOM operations. No model-provided JavaScript is ever evaluated. */
 internal object BrowserScripts {
+    val renderCounts = """
+        (() => {
+          const nodes = document.body ? [document.body, ...Array.from(document.body.querySelectorAll('*')).slice(0,999)] : [];
+          let visible = 0;
+          for (const node of nodes) {
+            if (['SCRIPT','STYLE','LINK','META','TEMPLATE','NOSCRIPT'].includes(node.tagName)) continue;
+            if (!node.getBoundingClientRect) continue;
+            let hidden = false, ancestor = node;
+            for (let depth=0; ancestor && depth<16; depth++, ancestor=ancestor.parentElement) {
+              const style = getComputedStyle(ancestor);
+              if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.opacity === '0') { hidden=true; break; }
+            }
+            if (hidden) continue;
+            const rect = node.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0 && ['BUTTON','INPUT','TEXTAREA','SELECT','IMG','SVG','CANVAS','VIDEO'].includes(node.tagName)) visible++;
+            // Text-node layout rectangles are counted without reading any text or form value.
+            for (const child of Array.from(node.childNodes || []).slice(0,32)) {
+              if (child.nodeType !== 3) continue;
+              const range = document.createRange(); range.selectNodeContents(child);
+              const textRect = range.getBoundingClientRect();
+              if (textRect.width > 0 && textRect.height > 0) visible++;
+              range.detach();
+            }
+          }
+          return JSON.stringify({elements:nodes.length,visible});
+        })()
+    """.trimIndent()
+
     private val visible = """
         const visible = el => {
           if (!el || !el.getClientRects().length || el.closest('[hidden],[aria-hidden="true"]')) return false;

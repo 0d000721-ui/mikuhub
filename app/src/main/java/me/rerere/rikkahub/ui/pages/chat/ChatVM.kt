@@ -45,6 +45,8 @@ import me.rerere.rikkahub.ui.hooks.writeStringPreference
 import me.rerere.rikkahub.ui.hooks.ChatInputState
 import me.rerere.rikkahub.utils.UiState
 import me.rerere.rikkahub.utils.UpdateChecker
+import me.rerere.rikkahub.ui.components.ai.OpenAiSpeed
+import me.rerere.rikkahub.ui.components.ai.updateOpenAiModelSpeed
 import java.util.Locale
 import kotlin.uuid.Uuid
 
@@ -182,6 +184,14 @@ class ChatVM(
         }
     }
 
+    fun setChatModelSpeed(modelId: Uuid, speed: OpenAiSpeed) {
+        viewModelScope.launch {
+            settingsStore.update { current ->
+                current.copy(providers = updateOpenAiModelSpeed(current.providers, modelId, speed))
+            }
+        }
+    }
+
     // Update checker
     val updateState = settingsStore.settingsFlow
         .map { settings ->
@@ -303,23 +313,15 @@ class ChatVM(
 
     fun updatePinnedStatus(conversation: Conversation) {
         viewModelScope.launch {
-            conversationRepo.togglePinStatus(conversation.id)
+            chatService.toggleConversationPinned(conversation.id)
         }
     }
 
     fun moveConversationToAssistant(conversation: Conversation, targetAssistantId: Uuid) {
         viewModelScope.launch {
-            val conversationFull = conversationRepo.getConversationById(conversation.id) ?: return@launch
-            // 文件夹是助手内分组，切换助手后原文件夹在新助手下不可见，需清空归属避免会话丢失
-            val updatedConversation = conversationFull.copy(
-                assistantId = targetAssistantId,
-                folderId = null,
-            )
+            chatService.moveConversationToAssistant(conversation.id, targetAssistantId)
             if (conversation.id == _conversationId) {
-                chatService.saveConversation(_conversationId, updatedConversation)
                 settingsStore.updateAssistant(targetAssistantId)
-            } else {
-                conversationRepo.updateConversation(updatedConversation)
             }
         }
     }

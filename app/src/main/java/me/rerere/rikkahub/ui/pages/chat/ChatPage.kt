@@ -62,6 +62,7 @@ import me.rerere.hugeicons.stroke.Menu03
 import me.rerere.hugeicons.stroke.MessageAdd01
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.Screen
+import me.rerere.rikkahub.browser.BrowserImageChatBridge
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.findProvider
 import me.rerere.rikkahub.data.datastore.getCurrentAssistant
@@ -282,6 +283,7 @@ private fun ChatPageContent(
     val scope = rememberCoroutineScope()
     val toaster = LocalToaster.current
     val workspaceRepository: WorkspaceRepository = koinInject()
+    val browserImageChat: BrowserImageChatBridge = koinInject()
     var previewMode by rememberSaveable { mutableStateOf(false) }
     val hazeState = rememberHazeState()
     val assistant = setting.getCurrentAssistant()
@@ -352,7 +354,10 @@ private fun ChatPageContent(
                     conversation = conversation,
                     onOpenContext = { navController.navigate(Screen.DeviceUsage(conversation.id.toString())) },
                     onOpenDownloads = { navController.navigate(Screen.DeviceDownload) },
-                    onOpenBrowser = { navController.navigate(Screen.AgentBrowser) },
+                    onOpenBrowser = {
+                        browserImageChat.openFromConversation(conversation.id)
+                        navController.navigate(Screen.AgentBrowser)
+                    },
                     hazeState = hazeState,
                     completionProviders = completionProviders,
                     onCancelClick = {
@@ -425,6 +430,7 @@ private fun ChatPageContent(
                     onUpdateChatModel = {
                         vm.setChatModel(assistant = setting.getCurrentAssistant(), model = it)
                     },
+                    onUpdateChatModelSpeed = vm::setChatModelSpeed,
                     onUpdateAssistant = {
                         vm.updateSettings(
                             setting.copy(

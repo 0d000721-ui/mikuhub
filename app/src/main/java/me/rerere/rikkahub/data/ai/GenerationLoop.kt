@@ -72,6 +72,7 @@ class GenerationLoop(
     private val context: Context,
     private val providerManager: ProviderManager,
     private val json: Json,
+    private val currentApprovalMode: () -> ExecutionApprovalMode = { ExecutionApprovalMode.IMPORTANT_ONLY },
 ) {
     fun generateText(
         settings: Settings,
@@ -177,7 +178,8 @@ class GenerationLoop(
                     val toolDef = tools.find { it.name == tool.toolName }
                     when {
                         // Tool needs approval and state is Auto -> set to Pending
-                        toolDef?.needsApproval(tool.inputAsJson()) == true &&
+                        ExecutionApprovalPolicy.requiresToolApproval(currentApprovalMode(), tool.toolName,
+                            toolDef?.needsApproval(tool.inputAsJson()) == true) &&
                             tool.approvalState is ToolApprovalState.Auto -> {
                             hasPendingApproval = true
                             tool.copy(approvalState = ToolApprovalState.Pending)
@@ -216,11 +218,13 @@ class GenerationLoop(
             } else {
                 // Resuming after user interaction - use the resumable tools directly.
                 Log.i(TAG, "generateText: resuming with ${pendingTools.size} resumable tools")
-                toolsToProcess = messages.last().getTools().filter { it.canResumeExecution }
+                // Auto tools from the same batch must not disappear when a sibling needed approval.
+                toolsToProcess = toolsAfterUserApproval(messages.last().getTools())
             }
 
             // Handle tools (execute approved tools, handle denied tools)
             val executedTools = arrayListOf<UIMessagePart.Tool>()
+            var approvalModeChanged = false
             toolsToProcess.forEach { tool ->
                 when (tool.approvalState) {
                     is ToolApprovalState.Denied -> {
@@ -265,6 +269,14 @@ class GenerationLoop(
                                 json.parseToJsonElement(tool.input.ifBlank { "{}" })
                             }.getOrElse {
                                 error("Invalid tool arguments JSON for ${tool.toolName}: ${it.message}")
+                            }
+                            // Read the live mode again: the user can switch back while another tool runs.
+                            if (tool.approvalState is ToolApprovalState.Auto &&
+                                ExecutionApprovalPolicy.requiresToolApproval(currentApprovalMode(), tool.toolName,
+                                    toolDef.needsApproval(args))) {
+                                executedTools += tool.copy(approvalState = ToolApprovalState.Pending)
+                                approvalModeChanged = true
+                                return@runCatching
                             }
                             Log.i(TAG, "generateText: executing tool ${toolDef.name} with args: $args")
                             val result = toolDef.execute(args)
@@ -322,6 +334,7 @@ class GenerationLoop(
                     )
                 )
             )
+            if (approvalModeChanged) break
         }
 
     }.flowOn(Dispatchers.IO)
@@ -422,7 +435,7 @@ class GenerationLoop(
                 addAll(assistant.customBodies)
                 addAll(model.customBodies)
             },
-            sessionId = conversationId?.toString(),
+            sessionId = (conversationId ?: Uuid.random()).toString(),
         )
         try {
             if (stream) {

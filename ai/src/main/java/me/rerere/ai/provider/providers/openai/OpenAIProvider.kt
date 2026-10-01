@@ -70,11 +70,20 @@ class OpenAIProvider(
             val request = Request.Builder()
                 .url("${setting.baseUrl}/models")
                 .header("Authorization", "Bearer $key")
+                .apply {
+                    if (setting.chatGptAccountId != null) header("Cache-Control", "no-cache, no-store")
+                }
                 .get()
                 .build()
 
             withOpenAIResponse(setting, client.newCall(request)) { response ->
                 if (!response.isSuccessful) {
+                    if (setting.chatGptAccountId != null) {
+                        val payload = runCatching {
+                            json.parseToJsonElement(response.peekBody(64L * 1024).string())
+                        }.getOrNull()
+                        throw chatGptResponseError(payload, response.code)
+                    }
                     error("Failed to get models: ${response.code} ${response.body.string()}")
                 }
                 val bodyJson = json.parseToJsonElement(response.body.string()).jsonObject

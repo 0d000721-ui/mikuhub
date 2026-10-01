@@ -28,7 +28,7 @@ internal fun buildApkInstallTools(
             Can wait up to 15 minutes for that download to finish, then automatically continue to installation without opening the Android installer UI.
             Uses the user's selected Shizuku (ADB shell) or Magisk/Root transport; never silently changes transport.
             The app handles device-session authorization/confirmation and displays the parsed APK package, version and hash.
-            With a session authorized for Shizuku, installation proceeds without repeated app confirmation.
+            In unrestricted execution mode, installation proceeds without app confirmation. In important_only mode, the app confirms the exact package before installation. Android/Shizuku/Root system permission is still required.
             Does not uninstall conflicting apps, downgrade packages, grant runtime permissions, bypass device restrictions or open the installed app.
             Read installed=true/status=SUCCEEDED before reporting success. Failure output explains the actual system error.
             Split APK sets (APKM/XAPK/APKS) are not supported. Installing this app's own update may close it; the receipt is checked on next launch.

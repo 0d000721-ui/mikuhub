@@ -32,6 +32,7 @@ class DeviceCommandController(
         return buildJsonObject {
             put("device", "the Android device running MikuHub")
             put("session_authorization", session.authorization.name)
+            put("execution_approval_mode", session.executionApprovalMode.storageValue)
             put("agent_stopped", session.stopped)
             put("selected_transport", session.state.value.preferredTransport.name.lowercase())
             put("execution_allowed_by_session", !session.stopped && session.authorization != DeviceAuthorization.REVOKED)
@@ -52,9 +53,9 @@ class DeviceCommandController(
                 put("last_verified_uid_0", backendStatus.root.state == RootState.AUTHORIZED)
                 put("detail", backendStatus.root.detail)
                 backendStatus.root.checkedAt?.let { put("checked_at", it) }
-                put("authorization", "Last verification only. Each root command rechecks UID 0 and requires device confirmation plus the su manager's permission.")
+                put("authorization", "Last verification only. Each root command rechecks UID 0 and still requires the su manager's permission. App confirmation follows execution_approval_mode.")
             }
-            put("usage", "transport=auto uses selected_transport, chosen by the user in Device Control (default shizuku). If the user selected root, use it even when Shizuku is unavailable. No fallback between transports. Uninstall/clear always require on-device confirmation.")
+            put("usage", "transport=auto uses selected_transport, chosen by the user in Device Control (default shizuku). If the user selected root, use it even when Shizuku is unavailable. No fallback between transports. important_only confirms changes and root commands; unrestricted approves app execution automatically. Stopped or revoked sessions remain blocked.")
         }
     }
 

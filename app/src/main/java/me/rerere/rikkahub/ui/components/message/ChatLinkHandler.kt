@@ -26,6 +26,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import me.rerere.rikkahub.Screen
 import me.rerere.rikkahub.browser.AgentBrowserController
+import me.rerere.rikkahub.browser.BrowserImageChatBridge
+import me.rerere.rikkahub.ui.context.LocalBrowserChatSource
 import me.rerere.rikkahub.device.DownloadInstallManager
 import me.rerere.rikkahub.ui.context.LocalNavController
 import org.koin.compose.koinInject
@@ -39,6 +41,8 @@ internal fun ChatLinkHandler(content: @Composable () -> Unit) {
     val nav = LocalNavController.current
     val manager = koinInject<DownloadInstallManager>()
     val browser = koinInject<AgentBrowserController>()
+    val imageChat = koinInject<BrowserImageChatBridge>()
+    val sourceConversation = LocalBrowserChatSource.current
     val scope = rememberCoroutineScope()
     var selected by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -63,6 +67,7 @@ internal fun ChatLinkHandler(content: @Composable () -> Unit) {
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
                 FilledTonalButton(
                     onClick = {
+                        imageChat.openFromConversation(sourceConversation)
                         browser.manualNavigate(url)
                         selected = null
                         nav.navigate(Screen.AgentBrowser)

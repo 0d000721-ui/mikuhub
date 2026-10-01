@@ -69,6 +69,7 @@ import me.rerere.rikkahub.Screen
 import me.rerere.rikkahub.data.datastore.isNotConfigured
 import me.rerere.rikkahub.data.files.FilesManager
 import me.rerere.rikkahub.ui.components.nav.BackButton
+import me.rerere.rikkahub.ui.components.ai.ExecutionApprovalControl
 import me.rerere.rikkahub.ui.components.ui.CardGroup
 import me.rerere.rikkahub.ui.components.ui.Select
 import me.rerere.rikkahub.ui.components.ui.icons.DiscordIcon
@@ -139,6 +140,11 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
             contentPadding = innerPadding + PaddingValues(8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            item("executionApproval") {
+                Column(Modifier.padding(horizontal = 8.dp)) {
+                    ExecutionApprovalControl(compact = false)
+                }
+            }
             item("sakuraFeatures") {
                 CardGroup(modifier = Modifier.padding(horizontal = 8.dp)) {
                     item(

@@ -34,6 +34,7 @@
 
 ## 最新修复
 
+- `20261001.8-upstream`：同步 RikkaHub 2.5.5 及官方主分支后续源码；更新 GPT-6 速度档位、账户模型自动刷新和 ChatGPT 网页生图入口，移除聊天区的用量管理显示。见[同步说明](docs/fixes/2026-10-01-upstream-sync.md)。
 - `20261001.7-codex`：新增 Codex / ChatGPT 账户入口、官方浏览器授权和账户模型发现；刷新保留模型配置，退出立即停止对应账户请求。见[接入说明](docs/fixes/2026-10-01-chatgpt-codex.md)。
 - `20260916.6-installfix`：修复静默安装的 `Unknown option -` 错误，更新 Shizuku 服务版本，并将长错误日志折叠为可展开详情。见[修复说明](docs/fixes/2026-09-16-apk-install.md)。
 
@@ -68,7 +69,7 @@
 
 ## 本地构建
 
-工具链：JDK 17、Android SDK 37、Gradle Wrapper；Web 前端使用 Node.js 22 和 pnpm 11。
+工具链：JDK 17（Gradle 守护进程使用配置的 JDK 21）、Android SDK 37.2、Gradle Wrapper 9.6；Web 前端使用 Node.js 22 和 pnpm 11。
 
 ```bash
 git clone --recurse-submodules https://github.com/0d000721-ui/mikuhub.git

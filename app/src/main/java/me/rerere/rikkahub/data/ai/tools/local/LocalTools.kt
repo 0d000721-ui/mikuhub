@@ -35,6 +35,8 @@ class LocalTools(
     val deviceCommandTool by lazy { buildDeviceCommandTool(deviceController) }
     val deviceStatusTool by lazy { buildDeviceStatusTool(deviceController) }
 
+    val chartDisplayTool by lazy { buildChartDisplayTool() }
+
     fun getTools(options: List<LocalToolOption>): List<Tool> {
         val tools = mutableListOf<Tool>()
         if (options.contains(LocalToolOption.JavascriptEngine)) {
@@ -62,6 +64,9 @@ class LocalTools(
         if (options.contains(LocalToolOption.DeviceCommands)) {
             tools.add(deviceStatusTool)
             tools.add(deviceCommandTool)
+        }
+        if (options.contains(LocalToolOption.ChartDisplay)) {
+            tools.add(chartDisplayTool)
         }
         return tools
     }

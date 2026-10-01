@@ -8,7 +8,10 @@ import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.Download04
 import me.rerere.hugeicons.stroke.Internet
 import me.rerere.rikkahub.Screen
+import me.rerere.rikkahub.browser.BrowserImageChatBridge
+import me.rerere.rikkahub.ui.context.LocalBrowserChatSource
 import me.rerere.rikkahub.ui.context.LocalNavController
+import org.koin.compose.koinInject
 
 internal val browserDownloadToolRenderers: List<ToolUIRenderer> = listOf(
     WebActionToolUI("download_start", "下载文件", true),
@@ -51,7 +54,12 @@ private class WebActionToolUI(
     @Composable
     override fun Summary(context: ToolUIContext) {
         val nav = LocalNavController.current
-        TextButton(onClick = { nav.navigate(if (download) Screen.DeviceDownload else Screen.AgentBrowser) }) {
+        val imageChat: BrowserImageChatBridge = koinInject()
+        val source = LocalBrowserChatSource.current
+        TextButton(onClick = {
+            if (!download) imageChat.openFromConversation(source)
+            nav.navigate(if (download) Screen.DeviceDownload else Screen.AgentBrowser)
+        }) {
             Text(if (toolName.startsWith("download_install")) "查看安装结果" else if (download) "查看实际下载进度" else "查看浏览器")
         }
     }
@@ -59,9 +67,12 @@ private class WebActionToolUI(
     @Composable
     override fun Preview(context: ToolUIContext, onDismissRequest: () -> Unit) {
         val nav = LocalNavController.current
+        val imageChat: BrowserImageChatBridge = koinInject()
+        val source = LocalBrowserChatSource.current
         DefaultToolPreview(context) {
             TextButton(onClick = {
                 onDismissRequest()
+                if (!download) imageChat.openFromConversation(source)
                 nav.navigate(if (download) Screen.DeviceDownload else Screen.AgentBrowser)
             }) { Text(if (download) "下载中心" else "浏览器") }
         }

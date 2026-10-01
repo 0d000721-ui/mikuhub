@@ -104,10 +104,12 @@ val dataSourceModule = module {
     single { McpManager(settingsStore = get(), appScope = get(), filesManager = get()) }
 
     single {
+        val approvals: me.rerere.rikkahub.data.ai.ExecutionApprovalStore = get()
         GenerationLoop(
             context = get(),
             providerManager = get(),
             json = get(),
+            currentApprovalMode = { approvals.mode.value },
         )
     }
 
@@ -217,7 +219,7 @@ val dataSourceModule = module {
         ProviderManager(client = get(), context = get(), openAiSettingResolver = accounts::resolveProvider)
     }
 
-    single { ChatGptProviderConnector(settingsStore = get(), providers = get()) }
+    single { ChatGptProviderConnector(settingsStore = get(), providers = get(), appScope = get(), accounts = get()) }
 
     single { BackupManager(context = get(), database = get(), settingsStore = get(), json = get()) }
 

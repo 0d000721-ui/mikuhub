@@ -43,6 +43,8 @@ import me.rerere.rikkahub.data.ai.chatgpt.ChatGptAuthStatus
 import me.rerere.rikkahub.ui.context.LocalToaster
 import me.rerere.rikkahub.ui.components.ui.AutoAIIcon
 import org.koin.compose.koinInject
+import java.text.DateFormat
+import java.util.Date
 
 @Composable
 internal fun ChatGptProviderConfigure(
@@ -54,6 +56,7 @@ internal fun ChatGptProviderConfigure(
     val connector = koinInject<ChatGptProviderConnector>()
     val appScope = koinInject<AppScope>()
     val loadingProviders by connector.loading.collectAsStateWithLifecycle()
+    val catalogStatuses by connector.catalogStatus.collectAsStateWithLifecycle()
     val accounts by manager.accounts.collectAsStateWithLifecycle()
     val authStatus by manager.authStatus.collectAsStateWithLifecycle()
     val currentProvider by rememberUpdatedState(provider)
@@ -169,7 +172,16 @@ internal fun ChatGptProviderConfigure(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (manageAccount) TextButton(
-                    onClick = { selected?.id?.let(::selectAndFetch) },
+                    onClick = {
+                        appScope.launch {
+                            try {
+                                connector.refreshIfStale(currentProvider.id, force = true)?.let { count ->
+                                    toaster.show("已更新 $count 个账户可用模型", type = ToastType.Success)
+                                }
+                            } catch (cancelled: CancellationException) { throw cancelled }
+                            catch (_: Exception) { toaster.show("模型目录刷新失败，请重试", type = ToastType.Error) }
+                        }
+                    },
                     enabled = selected?.planEnabled == true && selected.connected && !fetchingModels && !authorizing,
                 ) { Text(if (fetchingModels) "读取中…" else "刷新模型") }
                 TextButton(onClick = { uriHandler.openUri("https://chatgpt.com/settings/usage") }) { Text("Manage usage") }
@@ -188,6 +200,13 @@ internal fun ChatGptProviderConfigure(
                 }
             }
             if (manageAccount) Text("模型从所选账户实时读取 · ${provider.models.size} 个", style = MaterialTheme.typography.labelSmall)
+            if (manageAccount) {
+                val status = catalogStatuses[provider.id]?.takeIf { it.accountId == provider.chatGptAccountId }
+                status?.lastSuccessfulAt?.let { timestamp ->
+                    Text("最近成功更新：${DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(timestamp))}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                status?.error?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error) }
+            }
         }
     }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {

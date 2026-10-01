@@ -4,6 +4,10 @@ import com.google.firebase.Firebase
 import com.google.firebase.analytics.analytics
 import com.google.firebase.crashlytics.crashlytics
 import kotlinx.serialization.json.Json
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.launch
+import me.rerere.rikkahub.data.ai.ExecutionApprovalStore
 import me.rerere.rikkahub.AppScope
 import me.rerere.rikkahub.data.ai.tools.local.LocalTools
 import me.rerere.rikkahub.data.ai.tools.ChatToolFactory
@@ -24,6 +28,7 @@ import me.rerere.rikkahub.device.DeviceAuditStore
 import me.rerere.rikkahub.device.DownloadInstallManager
 import me.rerere.rikkahub.device.ApkInstallManager
 import me.rerere.rikkahub.browser.AgentBrowserController
+import me.rerere.rikkahub.browser.BrowserImageChatBridge
 import me.rerere.rikkahub.device.DebugCertificateStore
 import me.rerere.rikkahub.device.AndroidDeviceCommandBackend
 import me.rerere.rikkahub.device.DeviceCommandBackend
@@ -36,9 +41,22 @@ val appModule = module {
     single { ShizukuManager() }
     single { DeviceAuditStore(get()) }
     single { DownloadInstallManager(get()) }
-    single { AgentBrowserController(get(), get()) }
+    single { BrowserImageChatBridge(get(), get(), { get<ChatService>() }) }
+    single { AgentBrowserController(get(), get(), get()) }
     single { DebugCertificateStore(get()) }
-    single { me.rerere.rikkahub.device.DeviceAccessSession(get<DeviceAuditStore>()::append) }
+    single { ExecutionApprovalStore(get()) }
+    single {
+        val approvals: ExecutionApprovalStore = get()
+        me.rerere.rikkahub.device.DeviceAccessSession(
+            approvalMode = { approvals.mode.value },
+            approvalSnapshot = approvals::snapshot,
+            record = get<DeviceAuditStore>()::append,
+        ).also { session ->
+            get<AppScope>().launch(start = CoroutineStart.UNDISPATCHED) {
+                approvals.selectionChanges.drop(1).collect { session.approvalModeChanged() }
+            }
+        }
+    }
     single { DeviceCommandConfirmations() }
     single { ShizukuDeviceCommandRunner(get()) }
     single { RootDeviceCommandRunner() }
@@ -113,6 +131,7 @@ val appModule = module {
             downloadManager = get(),
             apkInstallManager = get(),
             browserController = get(),
+            browserImageChatBridge = get(),
         )
     }
 

@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -51,7 +53,6 @@ import me.rerere.ai.ui.UIMessagePart
 import me.rerere.ai.ui.metadataAs
 import me.rerere.ai.ui.toMetadata
 import me.rerere.ai.util.KeyRoulette
-import me.rerere.ai.util.HttpException
 import me.rerere.ai.util.SSEEventSource
 import me.rerere.ai.util.configureReferHeaders
 import me.rerere.ai.util.configureSessionHeaders
@@ -63,7 +64,6 @@ import me.rerere.ai.util.stringSafe
 import me.rerere.ai.util.toHeaders
 import me.rerere.common.http.await
 import me.rerere.common.http.jsonObjectOrNull
-import me.rerere.common.http.jsonPrimitiveOrNull
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -144,7 +144,7 @@ class ResponseAPI(
         providerSetting: ProviderSetting.OpenAI,
         messages: List<UIMessage>,
         params: TextGenerationParams
-    ): Flow<StreamChunk> = callbackFlow {
+    ): Flow<StreamChunk> = flow {
         val setting = normalizeChatGptProvider(providerSetting)
         val requestBody = buildRequestBody(
             providerSetting = setting,
@@ -152,6 +152,16 @@ class ResponseAPI(
             params = params,
             stream = true,
         )
+        emitAll(withChatGptFastTierCompatibility(requestBody) { body ->
+            streamTextRequest(setting, params, body)
+        })
+    }.flowOn(Dispatchers.IO).guardChatGptSession(providerSetting)
+
+    private fun streamTextRequest(
+        setting: ProviderSetting.OpenAI,
+        params: TextGenerationParams,
+        requestBody: JsonObject,
+    ): Flow<StreamChunk> = callbackFlow {
         val request = Request.Builder()
             .url("${setting.baseUrl}${setting.responsesPath}")
             .headers(params.customHeaders.toHeaders())
@@ -201,13 +211,20 @@ class ResponseAPI(
                     // successful SSE response as an error JSON document just because transport failed.
                     var exception = t ?: IOException("ChatGPT 请求失败（HTTP ${response?.code ?: "未知"}）")
                     if (response != null && !response.isSuccessful) {
-                        val errorCode = runCatching {
-                            val payload = json.parseToJsonElement(response.peekBody(64L * 1024).string())
-                            payload.jsonObjectOrNull?.get("error")?.jsonObjectOrNull
-                                ?.get("code")?.jsonPrimitiveOrNull?.contentOrNull
-                                ?.takeIf { it.matches(Regex("[a-zA-Z0-9_]{1,100}")) }
+                        val payload = runCatching {
+                            json.parseToJsonElement(response.peekBody(64L * 1024).string())
                         }.getOrNull()
-                        if (errorCode != null) exception = HttpException("ChatGPT 请求失败（HTTP ${response.code}，$errorCode）")
+                        val rejection = chatGptResponseError(payload, response.code)
+                        exception = if (isChatGptFastTierSpellingRejection(
+                                isChatGptAccount = true,
+                                requestBody = requestBody,
+                                statusCode = response.code,
+                                payload = payload,
+                            )) {
+                            ChatGptFastTierRejected(rejection)
+                        } else if (response.code in 400..499 || chatGptResponseErrorCode(payload) != null) {
+                            rejection
+                        } else IOException(rejection.message, t)
                     }
                     Log.w(TAG, "ChatGPT Responses 失败：HTTP ${response?.code ?: "未知"}，${exception.javaClass.simpleName}")
                     close(exception)
@@ -255,7 +272,7 @@ class ResponseAPI(
             eventSource.cancel()
         }
         // trySend 在缓冲满时会静默丢弃 delta，导致回复中间缺字 (#1295)，因此缓冲必须无界
-    }.buffer(Channel.UNLIMITED).flowOn(Dispatchers.IO).guardChatGptSession(providerSetting)
+    }.buffer(Channel.UNLIMITED).flowOn(Dispatchers.IO)
 
     internal fun buildRequestBody(
         providerSetting: ProviderSetting.OpenAI,
@@ -263,6 +280,9 @@ class ResponseAPI(
         params: TextGenerationParams,
         stream: Boolean
     ): JsonObject {
+        require(providerSetting.chatGptAccountId == null || BuiltInTools.ImageGeneration !in params.model.tools) {
+            CHATGPT_IMAGE_GENERATION_UNSUPPORTED
+        }
         val host = providerSetting.baseUrl.toHttpUrl().host
         val capabilities = resolveResponseProviderCapabilities(host)
         return buildJsonObject {

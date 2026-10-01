@@ -100,6 +100,9 @@ import me.rerere.hugeicons.stroke.FloppyDisk
 import me.rerere.hugeicons.stroke.Image03
 import me.rerere.hugeicons.stroke.Tools
 import me.rerere.rikkahub.R
+import me.rerere.rikkahub.Screen
+import me.rerere.rikkahub.browser.AgentBrowserController
+import me.rerere.rikkahub.browser.BrowserImageChatBridge
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.files.FileUtils
 import me.rerere.rikkahub.data.files.FilesManager
@@ -109,6 +112,7 @@ import me.rerere.rikkahub.ui.components.ui.FormItem
 import me.rerere.rikkahub.ui.components.ui.ImagePreviewDialog
 import me.rerere.rikkahub.ui.components.ui.OutlinedNumberInput
 import me.rerere.rikkahub.ui.context.LocalToaster
+import me.rerere.rikkahub.ui.context.LocalNavController
 import me.rerere.rikkahub.utils.ImageUtils
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
@@ -249,6 +253,9 @@ private fun ImageGenScreen(
     val settings by vm.settingsStore.settingsFlow.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val toaster = LocalToaster.current
+    val browser: AgentBrowserController = koinInject()
+    val browserImageChat: BrowserImageChatBridge = koinInject()
+    val nav = LocalNavController.current
     var showSettingsSheet by remember { mutableStateOf(false) }
     val sheetState = rememberBottomSheetState(
         initialValue = SheetValue.Hidden,
@@ -269,6 +276,19 @@ private fun ImageGenScreen(
             .padding(16.dp)
             .imePadding()
     ) {
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("ChatGPT 网页生图", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "使用 ChatGPT 网页账户，在官方界面选择可用的 Image 2／2.5 图片功能。生成后点网页保存；AI 操作需要你开启浏览器开关。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                TextButton(onClick = { browserImageChat.invalidate(); browser.openChatGptImages(); nav.navigate(Screen.AgentBrowser) }) {
+                    Text("打开 ChatGPT 网页")
+                }
+            }
+        }
         Box(
             modifier = Modifier
                 .fillMaxWidth()

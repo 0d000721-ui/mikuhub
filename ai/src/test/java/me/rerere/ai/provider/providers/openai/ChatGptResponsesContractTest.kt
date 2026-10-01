@@ -67,13 +67,13 @@ class ChatGptResponsesContractTest {
     }
 
     @Test
-    fun `account sampling remains available when supported none effort is selected`() {
+    fun `account preview rejects sampling even when supported none effort is selected`() {
         val body = ResponseAPI(OkHttpClient()).buildRequestBody(accountSetting(), listOf(UIMessage.user("hello")), TextGenerationParams(
             Model(modelId = "gpt-6-sol", abilities = listOf(ModelAbility.REASONING)),
             temperature = 0.7f, reasoningLevel = ReasoningLevel.OFF,
         ), stream = true)
         assertEquals("none", (body.getValue("reasoning") as kotlinx.serialization.json.JsonObject).getValue("effort").jsonPrimitive.content)
-        assertTrue(body.containsKey("temperature"))
+        assertFalse(body.containsKey("temperature"))
     }
 
     @Test

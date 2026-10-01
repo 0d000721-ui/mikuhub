@@ -13,6 +13,8 @@ import me.rerere.rikkahub.data.files.SkillManager
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.AssistantMode
 import me.rerere.rikkahub.browser.AgentBrowserController
+import me.rerere.rikkahub.browser.BrowserImageChatBridge
+import kotlin.uuid.Uuid
 import me.rerere.rikkahub.device.DownloadInstallManager
 import me.rerere.rikkahub.device.ApkInstallManager
 import me.rerere.rikkahub.data.repository.ConversationRepository
@@ -41,11 +43,13 @@ class ChatToolFactory(
     private val downloadManager: DownloadInstallManager,
     private val apkInstallManager: ApkInstallManager,
     private val browserController: AgentBrowserController,
+    private val browserImageChatBridge: BrowserImageChatBridge,
 ) {
     suspend fun createTools(
         settings: Settings,
         assistant: Assistant,
         model: Model,
+        conversationId: Uuid,
         workspaceCwd: String? = null,
     ): List<Tool> = buildList {
         if (assistant.enableMemory) {
@@ -70,7 +74,7 @@ class ChatToolFactory(
         if (assistant.mode != AssistantMode.ROLEPLAY) {
             addAll(createDownloadTools(downloadManager))
             addAll(createApkInstallTools(apkInstallManager))
-            addAll(createBrowserTools(browserController))
+            addAll(createBrowserTools(browserController, browserImageChatBridge, conversationId))
         }
         if (assistant.enableRecentChatsReference) {
             addAll(createConversationTools(conversationRepository, assistant.id))
