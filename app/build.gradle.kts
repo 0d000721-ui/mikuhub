@@ -30,7 +30,7 @@ android {
         applicationId = "me.rerere.rikkahub"
         minSdk = 26
         targetSdk = 37
-        versionCode = 191
+        versionCode = 192
         versionName = "2.5.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -88,8 +88,8 @@ android {
         }
         debug {
             applicationIdSuffix = ".debug"
-            versionNameSuffix = "-miku.20261001.8-upstream"
-            buildConfigField("String", "VERSION_NAME", "\"${android.defaultConfig.versionName}-miku.20261001.8-upstream\"")
+            versionNameSuffix = "-miku.20261001.9-browser-controls"
+            buildConfigField("String", "VERSION_NAME", "\"${android.defaultConfig.versionName}-miku.20261001.9-browser-controls\"")
             buildConfigField("String", "VERSION_CODE", "\"${android.defaultConfig.versionCode}\"")
         }
         create("optimized") {
@@ -98,8 +98,8 @@ android {
             signingConfig = signingConfigs.getByName("debug")
             matchingFallbacks += listOf("release", "debug")
             optimization { enable = true }
-            versionNameSuffix = "-miku.20261001.8-upstream"
-            buildConfigField("String", "VERSION_NAME", "\"${android.defaultConfig.versionName}-miku.20261001.8-upstream\"")
+            versionNameSuffix = "-miku.20261001.9-browser-controls"
+            buildConfigField("String", "VERSION_NAME", "\"${android.defaultConfig.versionName}-miku.20261001.9-browser-controls\"")
         }
     }
     compileOptions {
